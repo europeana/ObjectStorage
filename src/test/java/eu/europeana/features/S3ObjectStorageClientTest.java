@@ -53,7 +53,7 @@ public class S3ObjectStorageClientTest {
             host = s3server.getContainerIpAddress();
             client = new S3ObjectStorageClient(CLIENT_KEY, SECRET_KEY, BUCKET_NAME, "http://" + host + ":" + port + "/s3", new S3ClientOptions().withPathStyleAccess(true));
         } else {
-            client = new S3ObjectStorageClient("AKIAIU2L5YYINFHMW4IA", "80RUNDRZvgIAw5oMsYFlryHtCfZOT1JvgJLbkucg", "eu-central-1", "europeana-sitemap-test");
+            client = new S3ObjectStorageClient("some key", "some secret", "eu-central-1", "europeana-sitemap-test");
         }
     }
 
