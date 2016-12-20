@@ -178,8 +178,14 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
                 }
             }
 
-            return new StorageObject(object.getKey(),
-                    getUri(object.getKey()),
+            String key = object.getKey();
+            try {
+                object.close();
+            } catch (IOException e) {
+                logger.error("Error closing object to releases any underlying system resources.", e);
+            }
+            return new StorageObject(key,
+                    getUri(key),
                     objectMetadata.getLastModified(),
                     objectMetadata,
                     new ByteArrayPayload(content)
@@ -193,6 +199,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         final byte[] content;
         try {
             content = withContent ? IOUtils.toByteArray(object.getObjectContent()) : new byte[0];
+            object.close();
         } catch (IOException e) {
             throw new ObjectStorageClientException("Error while converting content to bytes", e);
         }
