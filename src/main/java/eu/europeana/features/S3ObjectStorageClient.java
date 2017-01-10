@@ -64,8 +64,12 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         for (S3ObjectSummary so : results) {
             storageObjects.add(toStorageObject(so));
         }
-
-
+        while (objectListing.isTruncated()) {
+            objectListing = client.listNextBatchOfObjects(objectListing);
+            for (S3ObjectSummary so : objectListing.getObjectSummaries()) {
+                storageObjects.add(toStorageObject(so));
+            }
+        }
         return storageObjects;
     }
 
@@ -202,6 +206,8 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
             object.close();
         } catch (IOException e) {
             throw new ObjectStorageClientException("Error while converting content to bytes", e);
+        } finally {
+            org.apache.commons.io.IOUtils.closeQuietly(object);
         }
         return content;
     }
