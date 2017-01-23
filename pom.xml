@@ -5,11 +5,11 @@
     <parent>
         <groupId>eu.europeana</groupId>
         <artifactId>europeana-parent-pom</artifactId>
-        <version>1.1</version>
+        <version>1.2-SNAPSHOT</version>
     </parent>
     <groupId>eu.europeana</groupId>
     <artifactId>object-storage</artifactId>
-    <version>1.1</version>
+    <version>1.1-SNAPSHOT</version>
     <dependencies>
         <dependency>
             <groupId>org.apache.jclouds</groupId>
@@ -37,6 +37,14 @@
             <artifactId>testcontainers</artifactId>
             <version>1.1.7</version>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-jdk14</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
         </dependency>
     </dependencies>
     <scm>
