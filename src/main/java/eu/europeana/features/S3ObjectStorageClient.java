@@ -28,11 +28,14 @@ import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+
+import static org.apache.commons.io.IOUtils.closeQuietly;
 //TODO LOGGING
 
 /**
@@ -96,18 +99,32 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         metadata.setContentType(storageObject.getMetadata().getContentType());
         metadata.setContentLength(storageObject.getMetadata().getContentLength());
         metadata.setContentMD5(storageObject.getMetadata().getContentMD5());
-        PutObjectResult putObjectResult = client.putObject(new PutObjectRequest(bucket, storageObject.getName(), storageObject.getPayload().getInput(), checkMetaData(metadata)));
+        PutObjectResult putObjectResult = null;
+        InputStream inputStream = null;
+        try {
+            inputStream = storageObject.getPayload().openStream();
+            putObjectResult = client.putObject(new PutObjectRequest(bucket, storageObject.getName(), inputStream, checkMetaData(metadata)));
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            closeQuietly(inputStream);
+        }
         return putObjectResult.getETag();
     }
 
     public String put(String key, Payload value) {
         com.amazonaws.services.s3.model.ObjectMetadata metadata = new com.amazonaws.services.s3.model.ObjectMetadata();
-
         byte[] content = new byte[0];
+        InputStream is = null;
         try {
-            content = IOUtils.toByteArray(value.getInput());
+            is = value.openStream();
+            content = IOUtils.toByteArray(is);
+            is.close();
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            closeQuietly(is);
+            is = null;
         }
         Integer intLength = new Integer(content.length);
         metadata.setContentLength(intLength.longValue());
@@ -116,7 +133,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
 
         metadata.setContentMD5(md5Base64);
 
-        PutObjectResult putObjectResult = client.putObject(new PutObjectRequest(bucket, key, value.getInput(), checkMetaData(metadata)));
+        PutObjectResult putObjectResult = client.putObject(new PutObjectRequest(bucket, key, new ByteArrayInputStream(content), checkMetaData(metadata)));
         return putObjectResult.getETag();
     }
 
@@ -207,7 +224,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         } catch (IOException e) {
             throw new ObjectStorageClientException("Error while converting content to bytes", e);
         } finally {
-            org.apache.commons.io.IOUtils.closeQuietly(object);
+            closeQuietly(object);
         }
         return content;
     }
