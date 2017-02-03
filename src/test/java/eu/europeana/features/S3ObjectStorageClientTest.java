@@ -192,7 +192,7 @@ public class S3ObjectStorageClientTest {
      * Does a stress test of puting, retrieving and deleting a small test object.
      * Note that this may take a while (approx. 6 1/2 minute for 1000 times)
      */
-    @Test(timeout=400000)
+    @Test(timeout=500000)
     public void testStressUpload() throws MalformedURLException, URISyntaxException {
         deleteOldTestObject();
 
