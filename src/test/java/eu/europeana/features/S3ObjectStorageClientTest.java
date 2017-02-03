@@ -38,7 +38,12 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Created by jeroen on 18-12-16.
+ * This class tests object storage and retrieval at Amazon S3.
+ * For this test to work properly you need to place an objectstorage.properties in the src/main/test/resources folder
+ * This file needs to contain the following keys that point to an existing bucket at S3 (s3.key, s3.secret, s3.region, s3.bucket).
+ *
+ * Created by jeroen on 18-12-16
+ * Updateb by Patrick Ehlert on Feb 2nd, 2017
  */
 @Ignore("TODO: fix ninja s3 server issue")
 public class S3ObjectStorageClientTest {
