@@ -42,12 +42,22 @@ public class StorageObject implements Comparable<StorageObject> {
     private final Payload payload;
     private ObjectMetadata metadata;
 
+    /**
+     * Create a new storage object. If no metadata is provided a basic one will be generated
+     * @param name required field
+     * @param uri required field
+     * @param lastModified
+     * @param metadata
+     * @param payload
+     */
     public StorageObject(String name, URI uri, Date lastModified,
                          ObjectMetadata metadata, Payload payload) {
         this.name = checkNotNull(name, "name");
         this.uri = checkNotNull(uri, "uri of %s", uri);
         if (metadata == null) {
             metadata = new ObjectMetadata();
+            // we want to at least set the content length, to optimize transfer speed
+            metadata.setContentLength(payload.getContentMetadata().getContentLength());
         }
         this.metadata = metadata;
         this.payload = payload;

@@ -1,9 +1,12 @@
 package eu.europeana.features;
 
 import com.amazonaws.regions.Regions;
+import com.amazonaws.services.kinesisanalytics.model.Input;
 import com.amazonaws.services.s3.S3ClientOptions;
 import com.amazonaws.services.s3.model.Bucket;
+import eu.europeana.domain.ObjectMetadata;
 import eu.europeana.domain.StorageObject;
+import org.apache.commons.io.IOUtils;
 import org.jclouds.io.Payload;
 import org.jclouds.io.payloads.ByteArrayPayload;
 import org.junit.After;
@@ -12,11 +15,20 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.stream.Collectors;
 
 import static java.lang.System.out;
@@ -30,22 +42,28 @@ import static org.junit.Assert.assertTrue;
  */
 @Ignore("TODO: fix ninja s3 server issue")
 public class S3ObjectStorageClientTest {
-    public static final String BUCKET_NAME = "europeana-sitemap-test";
-    public static final String OBJECT_DATA_MD5 = "hfMGNWAtwJvYWVem6CosIQ==";
-    public static final Integer EXPOSED_PORT = 9444;
-    public static final String CLIENT_KEY = "AKIAIOSFODNN7EXAMPLE";
-    public static final String SECRET_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
-    public static final String REGION = Regions.EU_CENTRAL_1.getName();
+
+    private static Logger logger = LoggerFactory.getLogger(S3ObjectStorageClientTest.class);
+
+    private static final String BUCKET_NAME = "europeana-sitemap-test";
+    private static final Integer EXPOSED_PORT = 9444;
+    private static final String CLIENT_KEY = "AKIAIOSFODNN7EXAMPLE";
+    private static final String SECRET_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
+    private static final String REGION = Regions.EU_CENTRAL_1.getName();
     private static GenericContainer s3server = new GenericContainer("meteogroup/s3mock:latest")
             .withExposedPorts(EXPOSED_PORT);
     private static int port;
     private static String host;
-    private static boolean runInDocker = true;
+    private static boolean runInDocker = false; // for now set to false until ninja s3 server issue is resolved
+
+    private static final String TEST_OBJECT_NAME = "test-object";
+    private static final String TEST_OBJECT_DATA = "object data";
+    private static final String TEST_OBJECT_DATA_MD5 = "hfMGNWAtwJvYWVem6CosIQ==";
 
     private static S3ObjectStorageClient client;
 
     @BeforeClass
-    public static void initClientAndTestServer() {
+    public static void initClientAndTestServer() throws IOException {
         //TODO fix Amazon Mock S3 Container setup
         if (runInDocker) {
             s3server.start();
@@ -53,8 +71,29 @@ public class S3ObjectStorageClientTest {
             host = s3server.getContainerIpAddress();
             client = new S3ObjectStorageClient(CLIENT_KEY, SECRET_KEY, BUCKET_NAME, "http://" + host + ":" + port + "/s3", new S3ClientOptions().withPathStyleAccess(true));
         } else {
-            client = new S3ObjectStorageClient("some key", "some secret", "eu-central-1", "europeana-sitemap-test");
+            Properties prop = loadAndCheckLoginProperties();
+            client = new S3ObjectStorageClient(prop.getProperty("s3.key"), prop.getProperty("s3.secret"), prop.getProperty("s3.region"), prop.getProperty("s3.bucket"));
         }
+    }
+
+    private static Properties loadAndCheckLoginProperties() throws IOException {
+        Properties prop = new Properties();
+        InputStream in = null;
+        try {
+            in = Thread.currentThread().getContextClassLoader().getResourceAsStream("objectstorage.properties");
+            if (in == null) {
+                throw new RuntimeException("Please provide objectstorage.properties file with login details");
+            }
+            prop.load(in);
+            // check if the properties contain login details for test and not production
+            String bucketName = prop.getProperty("s3.bucket");
+            if (bucketName != null && bucketName.contains("production")) {
+                throw new RuntimeException("Do not use production settings for unit tests!");
+            }
+        } finally {
+            IOUtils.closeQuietly(in);
+        }
+        return prop;
     }
 
     @AfterClass
@@ -78,30 +117,99 @@ public class S3ObjectStorageClientTest {
         }
     }
 
-    @Test
-    public void testUploadKeyValueHappyFlow() throws Exception {
-        final String OBJECT_NAME = "test-object";
-        final String OBJECT_DATA = "object data";
-        assertFalse(client.list().stream().map(StorageObject::getName).collect(Collectors.toList()).contains(OBJECT_NAME));
-        Payload payload = new ByteArrayPayload(OBJECT_DATA.getBytes());
-        String eid = client.put(OBJECT_NAME, payload);
-        assertNotNull(eid);
-        Optional<StorageObject> storageObject = client.get(OBJECT_NAME);
+    /**
+     * Check if our default test object already exists, if so it's probably from a previous test so we delete it
+     */
+    private void deleteOldTestObject() {
+        Optional<StorageObject> leftover = client.getWithoutBody(TEST_OBJECT_NAME);
+        if (leftover.isPresent())
+        {
+            logger.warn("Found previous test object, deleting it.");
+            client.delete(TEST_OBJECT_NAME);
+        }
+    }
+
+    private void testRetrieval() {
+        // retrieve with payload
+        Optional<StorageObject> storageObject = client.get(TEST_OBJECT_NAME);
         assertTrue(storageObject.isPresent());
         StorageObject storageObjectValue = storageObject.get();
-        assertEquals(OBJECT_NAME, storageObjectValue.getName());
-        assertEquals(OBJECT_DATA, new String(getRawContent(storageObjectValue)));
+        assertEquals(TEST_OBJECT_NAME, storageObjectValue.getName());
+        assertEquals(TEST_OBJECT_DATA, new String(getRawContent(storageObjectValue)));
 
-        assertTrue(client.list().stream().map(StorageObject::getName).collect(Collectors.toList()).contains(OBJECT_NAME));
-
-        Optional<StorageObject> storageObjectWithoutBody = client.getWithoutBody(OBJECT_NAME);
+        // retrieve without payload
+        Optional<StorageObject> storageObjectWithoutBody = client.getWithoutBody(TEST_OBJECT_NAME);
         assertTrue(storageObject.isPresent());
         StorageObject storageObjectWithoutBodyValue = storageObjectWithoutBody.get();
-        assertEquals(OBJECT_NAME, storageObjectWithoutBodyValue.getName());
+        assertEquals(TEST_OBJECT_NAME, storageObjectWithoutBodyValue.getName());
         assertEquals(0, getRawContent(storageObjectWithoutBodyValue).length);
 
-        client.delete(OBJECT_NAME);
-        assertFalse(client.list().stream().map(StorageObject::getName).collect(Collectors.toList()).contains(OBJECT_NAME));
+        // check if we can find it in list of objects, this make take quite some time
+        //assertTrue(client.list().stream().map(StorageObject::getName).collect(Collectors.toList()).contains(TEST_OBJECT_NAME));
+    }
+
+    /**
+     * Tests if we can put (using key and payload value), get and delete a simple object properly
+     */
+    @Test
+    public void testUploadKeyPayload() {
+        deleteOldTestObject();
+
+        Payload payload = new ByteArrayPayload(TEST_OBJECT_DATA.getBytes());
+        String eid = client.put(TEST_OBJECT_NAME, payload);
+        assertNotNull(eid);
+
+        testRetrieval();
+
+        // delete the object
+        client.delete(TEST_OBJECT_NAME);
+        assertFalse(client.get(TEST_OBJECT_NAME).isPresent());
+    }
+
+    /**
+     * Test put (as storage object), get and delete of small test object
+     * @throws MalformedURLException
+     * @throws URISyntaxException
+     */
+    @Test
+    public void testUploadStorageObject() throws MalformedURLException, URISyntaxException {
+        deleteOldTestObject();
+
+        // save test object
+        Payload payload = new ByteArrayPayload(TEST_OBJECT_DATA.getBytes());
+        StorageObject so = new StorageObject(TEST_OBJECT_NAME, new URL("http://www.europeana.eu/test/s3").toURI(), new Date(), null, payload);
+        String eid = client.put(so);
+        assertNotNull(eid);
+
+        testRetrieval();
+
+        // delete the object
+        client.delete(TEST_OBJECT_NAME);
+        assertFalse(client.get(TEST_OBJECT_NAME).isPresent());
+    }
+
+    /**
+     * Does a stress test of puting, retrieving and deleting a small test object.
+     * Note that this may take a while (approx. 6 1/2 minute for 1000 times)
+     */
+    @Test(timeout=400000)
+    public void testStressUpload() throws MalformedURLException, URISyntaxException {
+        deleteOldTestObject();
+
+        final int TEST_SIZE = 1000;
+        logger.info("Starting stress test with size "+TEST_SIZE);
+        for (int i = 0; i < TEST_SIZE ; i++) {
+            // alternate between key/value upload and storage object upload
+            if (i % 2 == 0) {
+                testUploadKeyPayload();
+            } else {
+                testUploadStorageObject();
+            }
+            // provide feedback about progress
+            if (i % 50 == 0) {
+                logger.info(Double.valueOf(i * 100.0 / TEST_SIZE) +"%");
+            }
+        }
     }
 
     //TODO test second put method
@@ -118,7 +226,6 @@ public class S3ObjectStorageClientTest {
         assertFalse(storageObject.isPresent());
     }
 
-    @Test
     public void testList() {
         List<StorageObject> list = client.list();
         for (StorageObject so : list) {
@@ -126,8 +233,6 @@ public class S3ObjectStorageClientTest {
         }
     }
 
-    @Ignore
-    @Test
     public void downloadAndPrintSitemapFile() throws IOException {
         Optional<StorageObject> storageObject = client.get("europeana-sitemap-hashed-blue.xml?from=179999&to=224999");
         String rawContent = new String(getRawContent(storageObject.get()));

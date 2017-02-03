@@ -42,7 +42,7 @@ import static org.apache.commons.io.IOUtils.closeQuietly;
  * Created by jeroen on 14-12-16.
  */
 public class S3ObjectStorageClient implements ObjectStorageClient {
-    public static Logger logger = LoggerFactory.getLogger(S3ObjectStorageClient.class);
+    private static Logger logger = LoggerFactory.getLogger(S3ObjectStorageClient.class);
     private AmazonS3 client;
     private String bucket;
 
@@ -60,10 +60,11 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     }
 
 
+    @Override
     public List<StorageObject> list() {
         ObjectListing objectListing = client.listObjects(bucket.toString());
         List<S3ObjectSummary> results = objectListing.getObjectSummaries();
-        ArrayList<StorageObject> storageObjects = new ArrayList<StorageObject>();
+        ArrayList<StorageObject> storageObjects = new ArrayList<>();
         for (S3ObjectSummary so : results) {
             storageObjects.add(toStorageObject(so));
         }
@@ -92,8 +93,9 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
 
     /**
      * @param storageObject
-     * @return ETag
+     * @return ETag or null of there was an error
      */
+    @Override
     public String put(StorageObject storageObject) {
         com.amazonaws.services.s3.model.ObjectMetadata metadata = new com.amazonaws.services.s3.model.ObjectMetadata();
         metadata.setContentType(storageObject.getMetadata().getContentType());
@@ -105,13 +107,14 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
             inputStream = storageObject.getPayload().openStream();
             putObjectResult = client.putObject(new PutObjectRequest(bucket, storageObject.getName(), inputStream, checkMetaData(metadata)));
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.error("Error storing object "+storageObject.getName(), e);
         } finally {
             closeQuietly(inputStream);
         }
-        return putObjectResult.getETag();
+        return (putObjectResult == null ? null : putObjectResult.getETag());
     }
 
+    @Override
     public String put(String key, Payload value) {
         com.amazonaws.services.s3.model.ObjectMetadata metadata = new com.amazonaws.services.s3.model.ObjectMetadata();
         byte[] content = new byte[0];
@@ -121,12 +124,11 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
             content = IOUtils.toByteArray(is);
             is.close();
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.error("Error storing payload for key "+key, e);
         } finally {
             closeQuietly(is);
-            is = null;
         }
-        Integer intLength = new Integer(content.length);
+        Integer intLength = content.length;
         metadata.setContentLength(intLength.longValue());
         byte[] md5 = Md5Utils.computeMD5Hash(content);
         String md5Base64 = BinaryUtils.toBase64(md5);
@@ -144,6 +146,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         return metadata;
     }
 
+    @Override
     public Optional<StorageObject> getWithoutBody(String objectName) {
         try {
             return Optional.of(retrieveStorageObject(objectName, Boolean.FALSE));
@@ -156,6 +159,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         }
     }
 
+    @Override
     public Optional<StorageObject> get(String objectName) {
         try {
             return Optional.of(retrieveStorageObject(objectName, Boolean.TRUE));
@@ -168,7 +172,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         }
     }
 
-
+    @Override
     public void delete(String objectName) {
         DeleteObjectRequest deleteObjectRequest = new DeleteObjectRequest(bucket.toString(), objectName);
         client.deleteObject(deleteObjectRequest);
