@@ -45,7 +45,6 @@ import static org.junit.Assert.assertTrue;
  * Created by jeroen on 18-12-16
  * Updateb by Patrick Ehlert on Feb 2nd, 2017
  */
-@Ignore("TODO: fix ninja s3 server issue")
 public class S3ObjectStorageClientTest {
 
     private static Logger logger = LoggerFactory.getLogger(S3ObjectStorageClientTest.class);
