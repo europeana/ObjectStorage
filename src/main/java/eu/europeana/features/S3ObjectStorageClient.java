@@ -59,7 +59,10 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         this.bucket = bucketName;
     }
 
-
+    /**
+     *
+     * @return a list of all storage objects in the bucket
+     */
     @Override
     public List<StorageObject> list() {
         ObjectListing objectListing = client.listObjects(bucket.toString());

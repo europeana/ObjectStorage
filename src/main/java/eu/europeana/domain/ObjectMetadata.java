@@ -136,7 +136,7 @@ public class ObjectMetadata implements Cloneable, Serializable {
         // http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
         String contentRange = (String) metadata.get(Headers.CONTENT_RANGE);
         if (contentRange != null) {
-            int pos = contentRange.lastIndexOf("/");
+            int pos = contentRange.lastIndexOf('/');
             if (pos >= 0)
                 return Long.parseLong(contentRange.substring(pos + 1));
         }

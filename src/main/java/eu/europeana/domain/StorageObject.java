@@ -57,7 +57,11 @@ public class StorageObject implements Comparable<StorageObject> {
         if (metadata == null) {
             metadata = new ObjectMetadata();
             // we want to at least set the content length, to optimize transfer speed
-            metadata.setContentLength(payload.getContentMetadata().getContentLength());
+            if (payload == null) {
+                metadata.setContentLength(0);
+            } else {
+                metadata.setContentLength(payload.getContentMetadata().getContentLength());
+            }
         }
         this.metadata = metadata;
         this.payload = payload;
@@ -135,11 +139,11 @@ public class StorageObject implements Comparable<StorageObject> {
                 .add("lastModified", getLastModified());
     }
 
-    //@Override
+    @Override
     public int compareTo(StorageObject that) {
         if (that == null)
             return 1;
-        if (this == that)
+        if (this.equals(that))
             return 0;
         return this.getName().compareTo(that.getName());
     }

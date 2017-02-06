@@ -211,12 +211,11 @@ public class S3ObjectStorageClientTest {
             }
             // provide feedback about progress
             if (i % 50 == 0) {
-                logger.info(Double.valueOf(i * 100.0 / TEST_SIZE) +"%");
+                logger.info(String.format("%.1f", i * 100.0 / TEST_SIZE) +"%");
             }
         }
     }
 
-    //TODO test second put method
     //TODO test metadata check(length header has to be set)
 
     private byte[] getRawContent(StorageObject storageObject) {
@@ -230,11 +229,36 @@ public class S3ObjectStorageClientTest {
         assertFalse(storageObject.isPresent());
     }
 
+    /**
+     * Simple test of listing all storage objects in the bucket.
+     * This test may take some time, depending on how much data is present.
+     */
+    @Test
     public void testList() {
+        deleteOldTestObject();
+
         List<StorageObject> list = client.list();
+        int count = list.size();
+        logger.info("Checking "+count+" storage objects...");
+        int i = 0;
         for (StorageObject so : list) {
-            out.println(list.toString());
+            assertNotNull(so);
+            // provide feedback about progress
+            i++;
+            if (i % 50 == 0) {
+                logger.info(String.format("%.1f", i * 100.0 / count) +"%");
+            }
         }
+
+        // add a new object and see if list count goes up with 1
+        String eid = client.put(TEST_OBJECT_NAME, new ByteArrayPayload(TEST_OBJECT_DATA.getBytes()));
+        assertNotNull(eid);
+        list = client.list();
+        assertEquals(count, list.size()-1);
+
+        client.delete(TEST_OBJECT_NAME);
+        list = client.list();
+        assertEquals(count, list.size());
     }
 
     public void downloadAndPrintSitemapFile() throws IOException {
