@@ -104,6 +104,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         metadata.setContentType(storageObject.getMetadata().getContentType());
         metadata.setContentLength(storageObject.getMetadata().getContentLength());
         metadata.setContentMD5(storageObject.getMetadata().getContentMD5());
+
         PutObjectResult putObjectResult = null;
         InputStream inputStream = null;
         try {
@@ -117,6 +118,12 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         return (putObjectResult == null ? null : putObjectResult.getETag());
     }
 
+    /**
+     * Store a key/payload combination
+     * @param key   corresponds to {@link StorageObject#getName()}.
+     * @param value corresponds to {@link StorageObject#getPayload()}.
+     * @return ETag or null of there was an error
+     */
     @Override
     public String put(String key, Payload value) {
         com.amazonaws.services.s3.model.ObjectMetadata metadata = new com.amazonaws.services.s3.model.ObjectMetadata();
@@ -135,11 +142,18 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         metadata.setContentLength(intLength.longValue());
         byte[] md5 = Md5Utils.computeMD5Hash(content);
         String md5Base64 = BinaryUtils.toBase64(md5);
-
         metadata.setContentMD5(md5Base64);
 
-        PutObjectResult putObjectResult = client.putObject(new PutObjectRequest(bucket, key, new ByteArrayInputStream(content), checkMetaData(metadata)));
-        return putObjectResult.getETag();
+        PutObjectResult putObjectResult = null;
+        InputStream inputStream = null;
+        try {
+            inputStream = new ByteArrayInputStream(content);
+            putObjectResult = client.putObject(new PutObjectRequest(bucket, key, new ByteArrayInputStream(content), checkMetaData(metadata)));
+        } finally {
+            closeQuietly(inputStream);
+        }
+
+        return (putObjectResult == null ? null : putObjectResult.getETag());
     }
 
     private com.amazonaws.services.s3.model.ObjectMetadata checkMetaData(com.amazonaws.services.s3.model.ObjectMetadata metadata) {
@@ -190,11 +204,16 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
             if (hasContent) {
                 byte[] clientSideHash = null;
                 byte[] serverSideHash = null;
+                InputStream inputStream = null;
                 try {
+                    inputStream = new ByteArrayInputStream(content);
                     clientSideHash = Md5Utils.computeMD5Hash(new ByteArrayInputStream(content));
                     serverSideHash = BinaryUtils.fromHex(object.getObjectMetadata().getETag());
                 } catch (Exception e) {
                     logger.warn("Unable to calculate MD5 hash to validate download: " + e.getMessage(), e);
+                }
+                finally {
+                    closeQuietly(inputStream);
                 }
 
                 if (clientSideHash != null && serverSideHash != null
