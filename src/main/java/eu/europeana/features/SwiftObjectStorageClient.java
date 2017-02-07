@@ -2,6 +2,7 @@ package eu.europeana.features;
 
 
 import eu.europeana.domain.ObjectMetadata;
+import eu.europeana.domain.ObjectStorageClientException;
 import eu.europeana.domain.StorageObject;
 import org.jclouds.ContextBuilder;
 import org.jclouds.io.Payload;
@@ -31,7 +32,7 @@ public class SwiftObjectStorageClient implements ObjectStorageClient {
 
         if (containerApi.get(containerName) == null) {
             if (!containerApi.create(containerName)) {
-                throw new RuntimeException("swift cannot create container: " + containerName);
+                throw new ObjectStorageClientException("Swift cannot create container: " + containerName);
             }
         }
 
