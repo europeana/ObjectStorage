@@ -42,23 +42,23 @@ import static org.junit.Assert.assertTrue;
  * For this test to work properly you need to place an objectstorage.properties in the src/main/test/resources folder
  * This file needs to contain the following keys that point to an existing bucket at S3 (s3.key, s3.secret, s3.region, s3.bucket).
  *
- * Created by jeroen on 18-12-16
- * Updateb by Patrick Ehlert on Feb 2nd, 2017
+ * Created by Jeroen Jeurissen on 18-12-16
+ * Updated by Patrick Ehlert on Feb 8th, 2017
  */
 public class S3ObjectStorageClientTest {
 
     private static Logger logger = LoggerFactory.getLogger(S3ObjectStorageClientTest.class);
 
+    // docker configuration, doesn't work yet because of an issue to the Amazon Mock S3 container
     private static final String BUCKET_NAME = "europeana-sitemap-test";
     private static final Integer EXPOSED_PORT = 9444;
     private static final String CLIENT_KEY = "AKIAIOSFODNN7EXAMPLE";
     private static final String SECRET_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
     private static final String REGION = Regions.EU_CENTRAL_1.getName();
-    private static GenericContainer s3server = new GenericContainer("meteogroup/s3mock:latest")
-            .withExposedPorts(EXPOSED_PORT);
+    private static GenericContainer s3server;
     private static int port;
     private static String host;
-    private static boolean runInDocker = false; // for now set to false until ninja s3 server issue is resolved
+    private static boolean runInDocker = false; // for now set to false
 
     private static final String TEST_OBJECT_NAME = "test-object";
     private static final String TEST_OBJECT_DATA = "object data";
@@ -70,6 +70,8 @@ public class S3ObjectStorageClientTest {
     public static void initClientAndTestServer() throws IOException {
         //TODO fix Amazon Mock S3 Container setup
         if (runInDocker) {
+            s3server = new GenericContainer("meteogroup/s3mock:latest")
+                    .withExposedPorts(EXPOSED_PORT);
             s3server.start();
             port = s3server.getMappedPort(EXPOSED_PORT);
             host = s3server.getContainerIpAddress();
@@ -200,7 +202,7 @@ public class S3ObjectStorageClientTest {
     public void testStressUpload() throws MalformedURLException, URISyntaxException {
         deleteOldTestObject();
 
-        final int TEST_SIZE = 1000;
+        final int TEST_SIZE = 100;
         logger.info("Starting stress test with size "+TEST_SIZE);
         for (int i = 0; i < TEST_SIZE ; i++) {
             // alternate between key/value upload and storage object upload
@@ -224,7 +226,7 @@ public class S3ObjectStorageClientTest {
 
 
     @Test
-    public void StorageObjectDoesNotExist() {
+    public void testStorageObjectDoesNotExist() {
         Optional<StorageObject> storageObject = client.getWithoutBody("test");
         assertFalse(storageObject.isPresent());
     }
