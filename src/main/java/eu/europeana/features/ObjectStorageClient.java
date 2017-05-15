@@ -20,6 +20,7 @@ package eu.europeana.features;
 import eu.europeana.domain.StorageObject;
 import org.jclouds.io.Payload;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 
@@ -67,17 +68,17 @@ public interface ObjectStorageClient {
     Optional<StorageObject> get(String objectName);
 
     /**
-     * Get the specified object and return it as a byte array
+     * Get the content of the specified object and return it as a byte array
      * @param objectName corresponds to {@link StorageObject#getName()}.
      * @return a byte array representing the retrieved object, or {@code null} if no object was retrieved
      */
-    //Optional<byte[]> getBytes(String objectName);
+    Optional<byte[]> getContentAsBytes(String objectName);
 
     /**
      * Verifies if the MD5 hash of the provided storageObject matches the hash stored at the object storage provider
      * @return true if the hash of the {@link StorageObject} matches the stored hash
      */
-    //boolean verify(StorageObject object)
+    boolean verify(StorageObject object) throws IOException;
 
     /**
      * Deletes an object, if present.

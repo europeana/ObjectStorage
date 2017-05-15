@@ -36,7 +36,6 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.apache.commons.io.IOUtils.closeQuietly;
-//TODO LOGGING
 
 /**
  * Client for accessing objects stored on Amazon S3 service.
@@ -47,7 +46,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     private static final Logger LOG = LoggerFactory.getLogger(S3ObjectStorageClient.class);
 
     private AmazonS3 client;
-    private String bucket;
+    private String bucketName;
 
     /**
      * Create a new S3 client
@@ -59,7 +58,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     public S3ObjectStorageClient(String clientKey, String secretKey, String region, String bucketName) {
         AWSCredentials credentials = new BasicAWSCredentials(clientKey, secretKey);
         client = AmazonS3ClientBuilder.standard().withCredentials(new AWSStaticCredentialsProvider(credentials)).withRegion(region).build();
-        this.bucket = bucketName;
+        this.bucketName = bucketName;
     }
 
     /**
@@ -74,7 +73,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         client = new AmazonS3Client(new BasicAWSCredentials(clientKey, secretKey));
         client.setS3ClientOptions(s3ClientOptions);
         client.setEndpoint(endpoint);
-        this.bucket = bucketName;
+        this.bucketName = bucketName;
     }
 
     /**
@@ -82,7 +81,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
      */
     @Override
     public List<StorageObject> list() {
-        ObjectListing objectListing = client.listObjects(bucket.toString());
+        ObjectListing objectListing = client.listObjects(bucketName);
         List<S3ObjectSummary> results = objectListing.getObjectSummaries();
         ArrayList<StorageObject> storageObjects = new ArrayList<>();
         for (S3ObjectSummary so : results) {
@@ -107,7 +106,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     }
 
     private URI getUri(String key) {
-        String bucketLocation = client.getBucketLocation(bucket.toString());
+        String bucketLocation = client.getBucketLocation(bucketName);
         return URI.create(bucketLocation + "/" + key);
     }
 
@@ -122,14 +121,10 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         metadata.setContentMD5(storageObject.getMetadata().getContentMD5());
 
         PutObjectResult putObjectResult = null;
-        InputStream inputStream = null;
-        try {
-            inputStream = storageObject.getPayload().openStream();
-            putObjectResult = client.putObject(new PutObjectRequest(bucket, storageObject.getName(), inputStream, checkMetaData(metadata)));
+        try (InputStream inputStream = storageObject.getPayload().openStream()) {
+            putObjectResult = client.putObject(new PutObjectRequest(bucketName, storageObject.getName(), inputStream, checkMetaData(metadata)));
         } catch (IOException e) {
             LOG.error("Error storing object "+storageObject.getName(), e);
-        } finally {
-            closeQuietly(inputStream);
         }
         return (putObjectResult == null ? null : putObjectResult.getETag());
     }
@@ -141,15 +136,10 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     public String put(String key, Payload value) {
         com.amazonaws.services.s3.model.ObjectMetadata metadata = new com.amazonaws.services.s3.model.ObjectMetadata();
         byte[] content = new byte[0];
-        InputStream is = null;
-        try {
-            is = value.openStream();
+        try (InputStream is = value.openStream()){
             content = IOUtils.toByteArray(is);
-            is.close();
         } catch (IOException e) {
-            LOG.error("Error storing payload for key "+key, e);
-        } finally {
-            closeQuietly(is);
+            LOG.error("Error reading payload for key "+key, e);
         }
         Integer intLength = content.length;
         metadata.setContentLength(intLength.longValue());
@@ -158,12 +148,10 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         metadata.setContentMD5(md5Base64);
 
         PutObjectResult putObjectResult = null;
-        InputStream inputStream = null;
-        try {
-            inputStream = new ByteArrayInputStream(content);
-            putObjectResult = client.putObject(new PutObjectRequest(bucket, key, inputStream, checkMetaData(metadata)));
-        } finally {
-            closeQuietly(inputStream);
+        try (InputStream is = new ByteArrayInputStream(content) ){
+            putObjectResult = client.putObject(new PutObjectRequest(bucketName, key, is, checkMetaData(metadata)));
+        } catch (IOException e) {
+            LOG.error("Error storing object with key "+key, e);
         }
 
         return (putObjectResult == null ? null : putObjectResult.getETag());
@@ -171,7 +159,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
 
     private com.amazonaws.services.s3.model.ObjectMetadata checkMetaData(com.amazonaws.services.s3.model.ObjectMetadata metadata) {
         if (metadata.getContentLength() == 0l) {
-            throw new ObjectStorageClientException("The metadata ContentLength is manditory");
+            throw new ObjectStorageClientException("The metadata ContentLength is mandatory");
         }
         return metadata;
     }
@@ -182,7 +170,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     @Override
     public Optional<StorageObject> getWithoutBody(String objectName) {
         try {
-            return Optional.of(retrieveStorageObject(objectName, Boolean.FALSE));
+            return Optional.of(retrieveAsStorageObject(objectName, Boolean.FALSE));
         } catch (AmazonS3Exception ex) {
             if (ex.getStatusCode() == 404) {
                 return Optional.empty();
@@ -198,7 +186,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     @Override
     public Optional<StorageObject> get(String objectName) {
         try {
-            return Optional.of(retrieveStorageObject(objectName, Boolean.TRUE));
+            return Optional.of(retrieveAsStorageObject(objectName, Boolean.TRUE));
         } catch (AmazonS3Exception ex) {
             if (ex.getStatusCode() == 404) {
                 return Optional.empty();
@@ -208,105 +196,103 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         }
     }
 
-     /**
+    /**
+     * @see eu.europeana.features.ObjectStorageClient#getContentAsBytes(String)
+     */
+    @Override
+    public Optional<byte[]> getContentAsBytes(String objectName) {
+        try {
+            return Optional.of(retrieveAsBytes(objectName));
+        } catch (AmazonS3Exception ex) {
+            if (ex.getStatusCode() == 404) {
+                return Optional.empty();
+            } else {
+                throw new ObjectStorageClientException("Error while retrieving storage object", ex);
+            }
+        }
+    }
+
+    /**
      * @see ObjectStorageClient#delete(String)
      */
     @Override
     public void delete(String objectName) {
-        DeleteObjectRequest deleteObjectRequest = new DeleteObjectRequest(bucket.toString(), objectName);
+        DeleteObjectRequest deleteObjectRequest = new DeleteObjectRequest(bucketName, objectName);
         client.deleteObject(deleteObjectRequest);
     }
 
-    private StorageObject retrieveStorageObject(String id, boolean hasContent) {
-        // 2017-05-12 Timing debug statements added for now as part of ticket #613.
-        // Can be removed when it's confirmed that timing is improved
-        long startTime = 0;
-        //if (LOG.isDebugEnabled())
-        { startTime = System.nanoTime(); }
-
+    /**
+     * Retrieve an object and return all information as a {@link StorageObject}}
+     * @param id
+     * @param getContent if false only header information is retrieved, if true payload is retrieved as well
+     * @return
+     */
+    private StorageObject retrieveAsStorageObject(String id, boolean getContent) {
         StorageObject result = null;
-
-        S3Object object = client.getObject(bucket, id);
-
-        long getObjectTime = 0;
-        long verifyHashTime = 0;
-        long createObjectTime = 0;
-        //if (LOG.isDebugEnabled())
-        { getObjectTime = System.nanoTime(); }
-
-        if (object != null) {
-            final byte[] content = getBytes(hasContent, object);
-            ObjectMetadata objectMetadata = new ObjectMetadata(object.getObjectMetadata().getRawMetadata());
-            if (hasContent) {
-                byte[] clientSideHash = null;
-                byte[] serverSideHash = null;
-                InputStream inputStream = null;
-                try {
-                    inputStream = new ByteArrayInputStream(content);
-                    clientSideHash = Md5Utils.computeMD5Hash(inputStream);
-                    serverSideHash = BinaryUtils.fromHex(object.getObjectMetadata().getETag());
-                    //if (LOG.isDebugEnabled()) {
-                } catch (Exception e) {
-                    LOG.warn("Unable to calculate MD5 hash to validate download: " + e.getMessage(), e);
-                }
-                finally {
-                    closeQuietly(inputStream);
-                }
-
-                if (clientSideHash != null && serverSideHash != null
-                        && !Arrays.equals(clientSideHash, serverSideHash)) {
-                    throw new SecurityException("Unable to verify integrity of data download.  " +
-                            "Client calculated content hash didn't match hash calculated by Amazon S3.  " +
-                            "The data stored in '"
-                            + "' may be corrupt.");
-                }
-
-
-                //if (LOG.isDebugEnabled()) {
-                    verifyHashTime = System.nanoTime();
-                    //output timing to get object and verify hash
-                       //};
-
-            }
-
+        try (S3Object object = client.getObject(bucketName, id)) {
             String key = object.getKey();
-            try {
-                object.close();
-            } catch (IOException e) {
-                LOG.error("Error closing object to releases any underlying system resources.", e);
-            }
+            ObjectMetadata objectMetadata = new ObjectMetadata(object.getObjectMetadata().getRawMetadata());
+            ByteArrayPayload content = (getContent ? new ByteArrayPayload(IOUtils.toByteArray(object.getObjectContent())) : new ByteArrayPayload(new byte[0]));
+            content.close();
+
             result = new StorageObject(key,
                     getUri(key),
                     objectMetadata.getLastModified(),
                     objectMetadata,
-                    new ByteArrayPayload(content)
-            );
-            createObjectTime = System.nanoTime();
-            LOG.error("S3 retrieveStorageObject timing: "+(getObjectTime - startTime) / 1000+";"+(verifyHashTime - getObjectTime) / 1000+";"+(createObjectTime-verifyHashTime)/1000);
-            return result;
-        }
-        return null;
-    }
-
-    private byte[] getBytes(Boolean withContent, S3Object object) {
-        final byte[] content;
-        try {
-            content = withContent ? IOUtils.toByteArray(object.getObjectContent()) : new byte[0];
-            object.close();
+                    content);
         } catch (IOException e) {
-            throw new ObjectStorageClientException("Error while converting content to bytes", e);
-        } finally {
-            closeQuietly(object);
+            LOG.error("Error retrieving storage object with id "+id, e);
         }
-        return content;
+
+        return result;
+    }
+
+    /**
+     * Retrieve an object and return it's content only as a byte[].
+     * Note that this is much faster than the retrieveStorageObject()
+     * @param id
+     * @return
+     */
+    private byte[] retrieveAsBytes(String id) {
+        try (S3Object object = client.getObject(bucketName, id)) {
+            return IOUtils.toByteArray(object.getObjectContent());
+        } catch (IOException e) {
+            LOG.error("Error retrieving storage object with id "+id, e);
+        }
+        return new byte[0];
+    }
+
+    /**
+     *  @see ObjectStorageClient#verify(StorageObject)
+     */
+    @Override
+    public boolean verify(StorageObject object) throws IOException {
+        byte[] clientSideHash = null;
+        byte[] serverSideHash = null;
+        try (InputStream in = new ByteArrayInputStream(IOUtils.toByteArray(object.getPayload().openStream()))) {
+            clientSideHash = Md5Utils.computeMD5Hash(in);
+            serverSideHash = BinaryUtils.fromHex(object.getMetadata().getETag());
+        }
+
+        return (clientSideHash != null && serverSideHash != null
+                && Arrays.equals(clientSideHash, serverSideHash));
     }
 
 
-    //
-    public Bucket createBucket(String bucket) {
-        return client.createBucket(bucket);
+    /**
+     * Create a new bucket with the provided name and switch to this new bucket
+     * @param bucketName
+     * @return 
+     */
+    public Bucket createBucket(String bucketName) {
+        Bucket result = client.createBucket(bucketName);
+        this.bucketName = bucketName;
+        return result;
     }
 
+    /**
+     * @return a list of all buckets
+     */
     public List<Bucket> listBuckets() {
         return client.listBuckets();
     }

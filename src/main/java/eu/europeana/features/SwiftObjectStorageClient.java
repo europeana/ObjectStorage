@@ -11,6 +11,7 @@ import org.jclouds.openstack.swift.v1.domain.SwiftObject;
 import org.jclouds.openstack.swift.v1.features.ContainerApi;
 import org.jclouds.openstack.swift.v1.features.ObjectApi;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -71,6 +72,16 @@ public class SwiftObjectStorageClient implements ObjectStorageClient {
 
     public Optional<StorageObject> get(String objectName) {
         return toStorageObject(objectApi.get(objectName));
+    }
+
+    @Override
+    public Optional<byte[]> getContentAsBytes(String objectName) {
+        throw new IllegalStateException("Not implemented yet");
+    }
+
+    @Override
+    public boolean verify(StorageObject object) throws IOException {
+        throw new IllegalStateException("Not implemented yet");
     }
 
 
