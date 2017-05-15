@@ -29,9 +29,7 @@ public interface ObjectStorageClient {
     /**
      * @return an {@link List<StorageObject>}.
      */
-
     List<StorageObject> list();
-
 
     /**
      * Creates or updates a {@link StorageObject}.
@@ -42,7 +40,6 @@ public interface ObjectStorageClient {
      */
     String put(String key, Payload value);
 
-
     /**
      * Creates or updates a {@link StorageObject}.
      *
@@ -51,33 +48,42 @@ public interface ObjectStorageClient {
      */
     String put(StorageObject storageObject);
 
-
     /**
      * Gets the {@link StorageObject} metadata without its {@link Payload#openStream() body}.
      *
      * @param objectName corresponds to {@link StorageObject#getName()}.
      * @return the {@link StorageObject} or {@code null}, if not found.
      */
-
     Optional<StorageObject> getWithoutBody(String objectName);
 
     /**
      * Gets the {@link StorageObject} including its {@link Payload#openStream() body}.
+     * Note that as of version 1.3 we no longer verify if the object was retrieved correctly. To do this you need to use
+     * the verify method
      *
      * @param objectName corresponds to {@link StorageObject#getName()}.
      * @return the {@link StorageObject} or {@code null}, if not found.
      */
-
     Optional<StorageObject> get(String objectName);
 
+    /**
+     * Get the specified object and return it as a byte array
+     * @param objectName corresponds to {@link StorageObject#getName()}.
+     * @return a byte array representing the retrieved object, or {@code null} if no object was retrieved
+     */
+    //Optional<byte[]> getBytes(String objectName);
+
+    /**
+     * Verifies if the MD5 hash of the provided storageObject matches the hash stored at the object storage provider
+     * @return true if the hash of the {@link StorageObject} matches the stored hash
+     */
+    //boolean verify(StorageObject object)
 
     /**
      * Deletes an object, if present.
      *
      * @param objectName corresponds to {@link StorageObject#getName()}.
      */
-
     void delete(String objectName);
-
 
 }

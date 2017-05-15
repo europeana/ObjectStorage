@@ -39,19 +39,37 @@ import static org.apache.commons.io.IOUtils.closeQuietly;
 //TODO LOGGING
 
 /**
+ * Client for accessing objects stored on Amazon S3 service.
  * Created by jeroen on 14-12-16.
  */
 public class S3ObjectStorageClient implements ObjectStorageClient {
-    private static Logger logger = LoggerFactory.getLogger(S3ObjectStorageClient.class);
+
+    private static final Logger LOG = LoggerFactory.getLogger(S3ObjectStorageClient.class);
+
     private AmazonS3 client;
     private String bucket;
 
-    public S3ObjectStorageClient(String clientKey, String secretKey, String region, String bucket) {
+    /**
+     * Create a new S3 client
+     * @param clientKey
+     * @param secretKey
+     * @param region
+     * @param bucketName
+     */
+    public S3ObjectStorageClient(String clientKey, String secretKey, String region, String bucketName) {
         AWSCredentials credentials = new BasicAWSCredentials(clientKey, secretKey);
         client = AmazonS3ClientBuilder.standard().withCredentials(new AWSStaticCredentialsProvider(credentials)).withRegion(region).build();
-        this.bucket = bucket;
+        this.bucket = bucketName;
     }
 
+    /**
+     * Create a new S3 client and specify an endpoint and options
+     * @param clientKey
+     * @param secretKey
+     * @param bucketName
+     * @param endpoint
+     * @param s3ClientOptions
+     */
     public S3ObjectStorageClient(String clientKey, String secretKey, String bucketName, String endpoint, S3ClientOptions s3ClientOptions) {
         client = new AmazonS3Client(new BasicAWSCredentials(clientKey, secretKey));
         client.setS3ClientOptions(s3ClientOptions);
@@ -60,8 +78,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     }
 
     /**
-     *
-     * @return a list of all storage objects in the bucket
+     * @see ObjectStorageClient#list()
      */
     @Override
     public List<StorageObject> list() {
@@ -95,8 +112,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     }
 
     /**
-     * @param storageObject
-     * @return ETag or null of there was an error
+     * @see ObjectStorageClient#put(StorageObject)
      */
     @Override
     public String put(StorageObject storageObject) {
@@ -111,7 +127,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
             inputStream = storageObject.getPayload().openStream();
             putObjectResult = client.putObject(new PutObjectRequest(bucket, storageObject.getName(), inputStream, checkMetaData(metadata)));
         } catch (IOException e) {
-            logger.error("Error storing object "+storageObject.getName(), e);
+            LOG.error("Error storing object "+storageObject.getName(), e);
         } finally {
             closeQuietly(inputStream);
         }
@@ -119,10 +135,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     }
 
     /**
-     * Store a key/payload combination
-     * @param key   corresponds to {@link StorageObject#getName()}.
-     * @param value corresponds to {@link StorageObject#getPayload()}.
-     * @return ETag or null of there was an error
+     * @see ObjectStorageClient#put(String, Payload)
      */
     @Override
     public String put(String key, Payload value) {
@@ -134,7 +147,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
             content = IOUtils.toByteArray(is);
             is.close();
         } catch (IOException e) {
-            logger.error("Error storing payload for key "+key, e);
+            LOG.error("Error storing payload for key "+key, e);
         } finally {
             closeQuietly(is);
         }
@@ -148,7 +161,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         InputStream inputStream = null;
         try {
             inputStream = new ByteArrayInputStream(content);
-            putObjectResult = client.putObject(new PutObjectRequest(bucket, key, new ByteArrayInputStream(content), checkMetaData(metadata)));
+            putObjectResult = client.putObject(new PutObjectRequest(bucket, key, inputStream, checkMetaData(metadata)));
         } finally {
             closeQuietly(inputStream);
         }
@@ -163,6 +176,9 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         return metadata;
     }
 
+    /**
+     * @see ObjectStorageClient#getWithoutBody(String)
+     */
     @Override
     public Optional<StorageObject> getWithoutBody(String objectName) {
         try {
@@ -176,6 +192,9 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         }
     }
 
+    /**
+     * @see eu.europeana.features.ObjectStorageClient#get(String)
+     */
     @Override
     public Optional<StorageObject> get(String objectName) {
         try {
@@ -189,15 +208,32 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         }
     }
 
+     /**
+     * @see ObjectStorageClient#delete(String)
+     */
     @Override
     public void delete(String objectName) {
         DeleteObjectRequest deleteObjectRequest = new DeleteObjectRequest(bucket.toString(), objectName);
         client.deleteObject(deleteObjectRequest);
     }
 
-
     private StorageObject retrieveStorageObject(String id, boolean hasContent) {
+        // 2017-05-12 Timing debug statements added for now as part of ticket #613.
+        // Can be removed when it's confirmed that timing is improved
+        long startTime = 0;
+        //if (LOG.isDebugEnabled())
+        { startTime = System.nanoTime(); }
+
+        StorageObject result = null;
+
         S3Object object = client.getObject(bucket, id);
+
+        long getObjectTime = 0;
+        long verifyHashTime = 0;
+        long createObjectTime = 0;
+        //if (LOG.isDebugEnabled())
+        { getObjectTime = System.nanoTime(); }
+
         if (object != null) {
             final byte[] content = getBytes(hasContent, object);
             ObjectMetadata objectMetadata = new ObjectMetadata(object.getObjectMetadata().getRawMetadata());
@@ -207,10 +243,11 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
                 InputStream inputStream = null;
                 try {
                     inputStream = new ByteArrayInputStream(content);
-                    clientSideHash = Md5Utils.computeMD5Hash(new ByteArrayInputStream(content));
+                    clientSideHash = Md5Utils.computeMD5Hash(inputStream);
                     serverSideHash = BinaryUtils.fromHex(object.getObjectMetadata().getETag());
+                    //if (LOG.isDebugEnabled()) {
                 } catch (Exception e) {
-                    logger.warn("Unable to calculate MD5 hash to validate download: " + e.getMessage(), e);
+                    LOG.warn("Unable to calculate MD5 hash to validate download: " + e.getMessage(), e);
                 }
                 finally {
                     closeQuietly(inputStream);
@@ -223,21 +260,30 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
                             "The data stored in '"
                             + "' may be corrupt.");
                 }
+
+
+                //if (LOG.isDebugEnabled()) {
+                    verifyHashTime = System.nanoTime();
+                    //output timing to get object and verify hash
+                       //};
+
             }
 
             String key = object.getKey();
             try {
                 object.close();
             } catch (IOException e) {
-                logger.error("Error closing object to releases any underlying system resources.", e);
+                LOG.error("Error closing object to releases any underlying system resources.", e);
             }
-            return new StorageObject(key,
+            result = new StorageObject(key,
                     getUri(key),
                     objectMetadata.getLastModified(),
                     objectMetadata,
                     new ByteArrayPayload(content)
-
             );
+            createObjectTime = System.nanoTime();
+            LOG.error("S3 retrieveStorageObject timing: "+(getObjectTime - startTime) / 1000+";"+(verifyHashTime - getObjectTime) / 1000+";"+(createObjectTime-verifyHashTime)/1000);
+            return result;
         }
         return null;
     }
