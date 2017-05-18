@@ -1,17 +1,18 @@
 package eu.europeana.features;
 
 
+import eu.europeana.domain.ContentValidationException;
 import eu.europeana.domain.ObjectMetadata;
 import eu.europeana.domain.ObjectStorageClientException;
 import eu.europeana.domain.StorageObject;
 import org.jclouds.ContextBuilder;
 import org.jclouds.io.Payload;
+import org.jclouds.io.payloads.ByteArrayPayload;
 import org.jclouds.openstack.swift.v1.SwiftApi;
 import org.jclouds.openstack.swift.v1.domain.SwiftObject;
 import org.jclouds.openstack.swift.v1.features.ContainerApi;
 import org.jclouds.openstack.swift.v1.features.ObjectApi;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -40,9 +41,10 @@ public class SwiftObjectStorageClient implements ObjectStorageClient {
         objectApi = swiftApi.getObjectApi(regionName, containerName);
     }
 
+    @Override
     public List<StorageObject> list() {
         List<SwiftObject> results = objectApi.list();
-        ArrayList<StorageObject> storageObjects = new ArrayList<StorageObject>();
+        ArrayList<StorageObject> storageObjects = new ArrayList<>();
         for (SwiftObject so : results) {
             storageObjects.add(toStorageObject(so).get());
         }
@@ -62,29 +64,44 @@ public class SwiftObjectStorageClient implements ObjectStorageClient {
         return Optional.of(new StorageObject(so.getName(), so.getUri(), so.getLastModified(), metadata, so.getPayload()));
     }
 
+    @Override
     public String put(StorageObject storageObject) {
         return objectApi.put(storageObject.getName(), storageObject.getPayload());
     }
 
+    @Override
     public Optional<StorageObject> getWithoutBody(String objectName) {
         return toStorageObject(objectApi.getWithoutBody(objectName));
     }
 
+    /**
+     * @see eu.europeana.features.ObjectStorageClient#get(String)
+     */
+    @Override
     public Optional<StorageObject> get(String objectName) {
         return toStorageObject(objectApi.get(objectName));
     }
 
+    /**
+     * @see eu.europeana.features.ObjectStorageClient#get(String, boolean)
+     */
     @Override
-    public Optional<byte[]> getContentAsBytes(String objectName) {
-        throw new IllegalStateException("Not implemented yet");
+    public Optional<StorageObject> get(String objectName, boolean verify) throws ContentValidationException {
+        if (verify) {
+            throw new IllegalStateException("Verification not implemented yet");
+        }
+        return toStorageObject(objectApi.get(objectName));
+    }
+
+    /**
+     * @see eu.europeana.features.ObjectStorageClient#getContent(String)
+     */
+    @Override
+    public byte[] getContent(String objectName) {
+        return ((ByteArrayPayload) objectApi.get(objectName).getPayload()).getRawContent();
     }
 
     @Override
-    public boolean verify(StorageObject object) throws IOException {
-        throw new IllegalStateException("Not implemented yet");
-    }
-
-
     public void delete(String objectName) {
         objectApi.delete(objectName);
     }

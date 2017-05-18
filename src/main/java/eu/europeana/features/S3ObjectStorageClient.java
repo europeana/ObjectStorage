@@ -7,17 +7,10 @@ import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.S3ClientOptions;
-import com.amazonaws.services.s3.model.AmazonS3Exception;
-import com.amazonaws.services.s3.model.Bucket;
-import com.amazonaws.services.s3.model.DeleteObjectRequest;
-import com.amazonaws.services.s3.model.ObjectListing;
-import com.amazonaws.services.s3.model.PutObjectRequest;
-import com.amazonaws.services.s3.model.PutObjectResult;
-import com.amazonaws.services.s3.model.S3Object;
-import com.amazonaws.services.s3.model.S3ObjectSummary;
+import com.amazonaws.services.s3.model.*;
 import com.amazonaws.util.BinaryUtils;
 import com.amazonaws.util.IOUtils;
-import com.amazonaws.util.Md5Utils;
+import eu.europeana.domain.ContentValidationException;
 import eu.europeana.domain.ObjectMetadata;
 import eu.europeana.domain.ObjectStorageClientException;
 import eu.europeana.domain.StorageObject;
@@ -30,12 +23,13 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
-
-import static org.apache.commons.io.IOUtils.closeQuietly;
 
 /**
  * Client for accessing objects stored on Amazon S3 service.
@@ -44,6 +38,7 @@ import static org.apache.commons.io.IOUtils.closeQuietly;
 public class S3ObjectStorageClient implements ObjectStorageClient {
 
     private static final Logger LOG = LoggerFactory.getLogger(S3ObjectStorageClient.class);
+    private static final String ERROR_MSG_RETRIEVE = "Error retrieving storage object ";
 
     private AmazonS3 client;
     private String bucketName;
@@ -136,17 +131,22 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     public String put(String key, Payload value) {
         com.amazonaws.services.s3.model.ObjectMetadata metadata = new com.amazonaws.services.s3.model.ObjectMetadata();
         byte[] content = new byte[0];
-        try (InputStream is = value.openStream()){
-            content = IOUtils.toByteArray(is);
+
+        try {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            try (DigestInputStream dis = new DigestInputStream(value.openStream(), md)) {
+                content = IOUtils.toByteArray(dis);
+                metadata.setContentMD5(BinaryUtils.toBase64(md.digest()));
+            }
+        } catch (NoSuchAlgorithmException e) {
+            LOG.error("Cannot calculate MD5 hash of because no MD5 algorithm was found",e );
         } catch (IOException e) {
             LOG.error("Error reading payload for key "+key, e);
         }
-        Integer intLength = content.length;
+        Integer intLength = Integer.valueOf(content.length);
         metadata.setContentLength(intLength.longValue());
-        byte[] md5 = Md5Utils.computeMD5Hash(content);
-        String md5Base64 = BinaryUtils.toBase64(md5);
-        metadata.setContentMD5(md5Base64);
 
+        // TODO figure out if we really need to create a new stream here or can make it more efficient by using the previously used stream
         PutObjectResult putObjectResult = null;
         try (InputStream is = new ByteArrayInputStream(content) ){
             putObjectResult = client.putObject(new PutObjectRequest(bucketName, key, is, checkMetaData(metadata)));
@@ -170,12 +170,14 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     @Override
     public Optional<StorageObject> getWithoutBody(String objectName) {
         try {
-            return Optional.of(retrieveAsStorageObject(objectName, Boolean.FALSE));
+            return Optional.of(retrieveAsStorageObject(objectName, Boolean.FALSE, Boolean.FALSE));
+        } catch (ContentValidationException e) {
+            throw new ObjectStorageClientException(ERROR_MSG_RETRIEVE +objectName+ " without body", e);
         } catch (AmazonS3Exception ex) {
             if (ex.getStatusCode() == 404) {
                 return Optional.empty();
             } else {
-                throw new ObjectStorageClientException("Error while retrieving storageObject without body", ex);
+                throw new ObjectStorageClientException(ERROR_MSG_RETRIEVE +objectName+ " without body", ex);
             }
         }
     }
@@ -186,30 +188,49 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     @Override
     public Optional<StorageObject> get(String objectName) {
         try {
-            return Optional.of(retrieveAsStorageObject(objectName, Boolean.TRUE));
+            return Optional.of(retrieveAsStorageObject(objectName, Boolean.TRUE, Boolean.FALSE));
+        } catch (ContentValidationException e) {
+            throw new ObjectStorageClientException(ERROR_MSG_RETRIEVE +objectName, e);
         } catch (AmazonS3Exception ex) {
             if (ex.getStatusCode() == 404) {
                 return Optional.empty();
             } else {
-                throw ex;
+                throw new ObjectStorageClientException(ERROR_MSG_RETRIEVE +objectName, ex);
             }
         }
     }
 
     /**
-     * @see eu.europeana.features.ObjectStorageClient#getContentAsBytes(String)
+     * @see eu.europeana.features.ObjectStorageClient#get(String, boolean)
      */
     @Override
-    public Optional<byte[]> getContentAsBytes(String objectName) {
+    public Optional<StorageObject> get(String objectName, boolean verify) throws ContentValidationException {
         try {
-            return Optional.of(retrieveAsBytes(objectName));
+            return Optional.of(retrieveAsStorageObject(objectName, Boolean.TRUE, verify));
         } catch (AmazonS3Exception ex) {
             if (ex.getStatusCode() == 404) {
                 return Optional.empty();
             } else {
-                throw new ObjectStorageClientException("Error while retrieving storage object", ex);
+                throw new ObjectStorageClientException(ERROR_MSG_RETRIEVE +objectName, ex);
             }
         }
+    }
+
+
+    /**
+     * @see eu.europeana.features.ObjectStorageClient#getContent(String)
+     */
+    @Override
+    public byte[] getContent(String objectName) {
+        byte[] result = new byte[0];
+        try {
+            result = retrieveAsBytes(objectName);
+        } catch (AmazonS3Exception ex) {
+            if (ex.getStatusCode() != 404) {
+                throw new ObjectStorageClientException(ERROR_MSG_RETRIEVE +objectName, ex);
+            }
+        }
+        return result;
     }
 
     /**
@@ -227,12 +248,24 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
      * @param getContent if false only header information is retrieved, if true payload is retrieved as well
      * @return
      */
-    private StorageObject retrieveAsStorageObject(String id, boolean getContent) {
+    private StorageObject retrieveAsStorageObject(String id, boolean getContent, boolean verify) throws ContentValidationException {
         StorageObject result = null;
         try (S3Object object = client.getObject(bucketName, id)) {
             String key = object.getKey();
             ObjectMetadata objectMetadata = new ObjectMetadata(object.getObjectMetadata().getRawMetadata());
-            ByteArrayPayload content = (getContent ? new ByteArrayPayload(IOUtils.toByteArray(object.getObjectContent())) : new ByteArrayPayload(new byte[0]));
+
+            ByteArrayPayload content = null;
+
+            if (getContent) {
+                S3ObjectInputStream contentStream = object.getObjectContent();
+                if (verify) {
+                    content = readAndVerifyContent(contentStream, BinaryUtils.fromHex(objectMetadata.getETag()));
+                } else {
+                    content = new ByteArrayPayload(IOUtils.toByteArray(contentStream));
+                }
+            } else {
+                content = new ByteArrayPayload(new byte[0]);
+            }
             content.close();
 
             result = new StorageObject(key,
@@ -240,10 +273,37 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
                     objectMetadata.getLastModified(),
                     objectMetadata,
                     content);
-        } catch (IOException e) {
-            LOG.error("Error retrieving storage object with id "+id, e);
+        } catch (IOException e){
+            LOG.error("Error reading object content", e);
         }
 
+        return result;
+    }
+
+    /**
+     * Add a messageDigest to the provided stream and calculate the hash when reading is done.
+     * Then the hash is compared to the hash on the server.
+     * @param contentStream
+     * @param serverSideHash
+     * @return read and verified content from the stream
+     * @throws ContentValidationException, IOException
+     */
+    private ByteArrayPayload readAndVerifyContent(S3ObjectInputStream contentStream, byte[] serverSideHash) throws ContentValidationException, IOException {
+        ByteArrayPayload result = null;
+        try {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            try (DigestInputStream dis = new DigestInputStream(contentStream, md)) {
+                result = new ByteArrayPayload(IOUtils.toByteArray(dis));
+                result.close();
+                byte[] streamHash = md.digest();
+                if (streamHash == null || serverSideHash == null || !Arrays.equals(streamHash, serverSideHash)) {
+                    throw new ContentValidationException("Error comparing retrieved content hash with server hash (content = "
+                            +Arrays.toString(streamHash)+ ", server = "+Arrays.toString(serverSideHash));
+                }
+            }
+        } catch (NoSuchAlgorithmException e) {
+            throw new ContentValidationException("Cannot verify MD5 hash of downloaded content because no MD5 algorithm was found",e );
+        }
         return result;
     }
 
@@ -257,27 +317,10 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         try (S3Object object = client.getObject(bucketName, id)) {
             return IOUtils.toByteArray(object.getObjectContent());
         } catch (IOException e) {
-            LOG.error("Error retrieving storage object with id "+id, e);
+            LOG.error(ERROR_MSG_RETRIEVE +id, e);
         }
         return new byte[0];
     }
-
-    /**
-     *  @see ObjectStorageClient#verify(StorageObject)
-     */
-    @Override
-    public boolean verify(StorageObject object) throws IOException {
-        byte[] clientSideHash = null;
-        byte[] serverSideHash = null;
-        try (InputStream in = new ByteArrayInputStream(IOUtils.toByteArray(object.getPayload().openStream()))) {
-            clientSideHash = Md5Utils.computeMD5Hash(in);
-            serverSideHash = BinaryUtils.fromHex(object.getMetadata().getETag());
-        }
-
-        return (clientSideHash != null && serverSideHash != null
-                && Arrays.equals(clientSideHash, serverSideHash));
-    }
-
 
     /**
      * Create a new bucket with the provided name and switch to this new bucket

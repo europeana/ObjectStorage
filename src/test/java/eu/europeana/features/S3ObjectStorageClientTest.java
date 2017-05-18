@@ -1,8 +1,11 @@
 package eu.europeana.features;
 
 import com.amazonaws.regions.Regions;
+import com.amazonaws.services.dynamodbv2.document.Expected;
 import com.amazonaws.services.s3.S3ClientOptions;
 import com.amazonaws.services.s3.model.Bucket;
+import com.amazonaws.services.s3.model.ObjectMetadata;
+import eu.europeana.domain.ContentValidationException;
 import eu.europeana.domain.StorageObject;
 import org.apache.commons.io.IOUtils;
 import org.jclouds.io.Payload;
@@ -143,14 +146,13 @@ public class S3ObjectStorageClientTest {
 
     /**
      * We support 3 different methods to retrieve data, in this method we test all 3
-     * @throws IOException
+     * @throws eu.europeana.domain.ContentValidationException
      */
-    private void testRetrieval() throws IOException {
+    private void testRetrieval() throws ContentValidationException {
         // retrieve content as bytes
-        Optional<byte[]> content = client.getContentAsBytes(TEST_OBJECT_NAME);
-        assertTrue(content.isPresent());
-        byte[] contentBytes = content.get();
-        assertEquals(TEST_OBJECT_DATA, new String(contentBytes));
+        byte[] content = client.getContent(TEST_OBJECT_NAME);
+        assertNotNull(content);
+        assertEquals(TEST_OBJECT_DATA, new String(content));
 
         // retrieve as storageobject without payload
         Optional<StorageObject> storageObjectWithoutBody = client.getWithoutBody(TEST_OBJECT_NAME);
@@ -159,14 +161,19 @@ public class S3ObjectStorageClientTest {
         assertEquals(TEST_OBJECT_NAME, storageObjectWithoutBodyValue.getName());
         assertEquals(0, getRawContent(storageObjectWithoutBodyValue).length);
 
-        // retrieve as storageobject with payload
+        // retrieve as storageobject with payload without verification
         Optional<StorageObject> storageObject = client.get(TEST_OBJECT_NAME);
         assertTrue(storageObject.isPresent());
         StorageObject storageObjectValue = storageObject.get();
         assertEquals(TEST_OBJECT_NAME, storageObjectValue.getName());
         assertEquals(TEST_OBJECT_DATA, new String(getRawContent(storageObjectValue)));
-        // verify hash of storageObject
-        assertTrue(client.verify(storageObjectValue));
+
+        // retrieve as storageobject with payload with verification
+        storageObject = client.get(TEST_OBJECT_NAME, true);
+        assertTrue(storageObject.isPresent());
+        storageObjectValue = storageObject.get();
+        assertEquals(TEST_OBJECT_NAME, storageObjectValue.getName());
+        assertEquals(TEST_OBJECT_DATA, new String(getRawContent(storageObjectValue)));
 
         // check if we can find it in list of objects, this make take quite some time
         //assertTrue(client.list().stream().map(StorageObject::getName).collect(Collectors.toList()).contains(TEST_OBJECT_NAME));
@@ -176,7 +183,7 @@ public class S3ObjectStorageClientTest {
      * Tests if we can put (using key and payload value), get and delete a simple object properly
      */
     @Test
-    public void testUploadKeyPayload() throws IOException {
+    public void testUploadKeyPayload() throws ContentValidationException {
         deleteOldTestObject();
 
         Payload payload = new ByteArrayPayload(TEST_OBJECT_DATA.getBytes());
@@ -196,7 +203,7 @@ public class S3ObjectStorageClientTest {
      * @throws URISyntaxException
      */
     @Test
-    public void testUploadStorageObject() throws IOException, URISyntaxException {
+    public void testUploadStorageObject() throws ContentValidationException, IOException, URISyntaxException {
         deleteOldTestObject();
 
         // save test object
@@ -217,7 +224,7 @@ public class S3ObjectStorageClientTest {
      * Note that this may take a while (approx. 6 1/2 minute for 1000 items)
      */
     @Test (timeout=500000)
-    public void testStressUpload() throws IOException, URISyntaxException {
+    public void testStressUpload() throws ContentValidationException, IOException, URISyntaxException {
         deleteOldTestObject();
 
         final int TEST_SIZE = 100;
