@@ -158,7 +158,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     }
 
     private com.amazonaws.services.s3.model.ObjectMetadata checkMetaData(com.amazonaws.services.s3.model.ObjectMetadata metadata) {
-        if (metadata.getContentLength() == 0l) {
+        if (metadata.getContentLength() == 0L) {
             throw new ObjectStorageClientException("The metadata ContentLength is mandatory");
         }
         return metadata;
@@ -170,7 +170,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     @Override
     public Optional<StorageObject> getWithoutBody(String objectName) {
         try {
-            return Optional.of(retrieveAsStorageObject(objectName, Boolean.FALSE, Boolean.FALSE));
+            return Optional.of(retrieveAsStorageObject(objectName, false, false));
         } catch (ContentValidationException e) {
             throw new ObjectStorageClientException(ERROR_MSG_RETRIEVE +objectName+ " without body", e);
         } catch (AmazonS3Exception ex) {
@@ -188,7 +188,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     @Override
     public Optional<StorageObject> get(String objectName) {
         try {
-            return Optional.of(retrieveAsStorageObject(objectName, Boolean.TRUE, Boolean.FALSE));
+            return Optional.of(retrieveAsStorageObject(objectName, true, false));
         } catch (ContentValidationException e) {
             throw new ObjectStorageClientException(ERROR_MSG_RETRIEVE +objectName, e);
         } catch (AmazonS3Exception ex) {
@@ -206,7 +206,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     @Override
     public Optional<StorageObject> get(String objectName, boolean verify) throws ContentValidationException {
         try {
-            return Optional.of(retrieveAsStorageObject(objectName, Boolean.TRUE, verify));
+            return Optional.of(retrieveAsStorageObject(objectName, true, verify));
         } catch (AmazonS3Exception ex) {
             if (ex.getStatusCode() == 404) {
                 return Optional.empty();
