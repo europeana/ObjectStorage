@@ -38,6 +38,7 @@ import java.util.Optional;
 public class S3ObjectStorageClient implements ObjectStorageClient {
 
     private static final Logger LOG = LoggerFactory.getLogger(S3ObjectStorageClient.class);
+
     private static final String ERROR_MSG_RETRIEVE = "Error retrieving storage object ";
 
     private AmazonS3 client;
@@ -70,6 +71,18 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         client.setEndpoint(endpoint);
         this.bucketName = bucketName;
     }
+
+    /**
+     * @see ObjectStorageClient#getName()
+     */
+    @Override
+    public String getName() { return "Amazon S3"; }
+
+    /**
+     * @see ObjectStorageClient#getBucketName()
+     */
+    @Override
+    public String getBucketName() { return bucketName; }
 
     /**
      * @see ObjectStorageClient#list()
@@ -243,6 +256,15 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     }
 
     /**
+     * @see ObjectStorageClient#close()
+     */
+    @Override
+    public void close() {
+        LOG.info("Shutting down connections to " +this.getName()+ "...");
+        ((AmazonS3Client) client).shutdown();
+    }
+
+    /**
      * Retrieve an object and return all information as a {@link StorageObject}}
      * @param id
      * @param getContent if false only header information is retrieved, if true payload is retrieved as well
@@ -340,11 +362,12 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         return client.listBuckets();
     }
 
-    public void deleteBucket(String bucket) {
-        client.deleteBucket(bucket);
+    public void deleteBucket(String bucket) { client.deleteBucket(bucket);
     }
 
     public void setS3ClientOptions(S3ClientOptions s3ClientOptions) {
         client.setS3ClientOptions(s3ClientOptions);
     }
+
+
 }

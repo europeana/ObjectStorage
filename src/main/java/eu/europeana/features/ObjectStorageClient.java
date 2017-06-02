@@ -24,8 +24,21 @@ import org.jclouds.io.Payload;
 import java.util.List;
 import java.util.Optional;
 
-
+/**
+ *  Interface to a generic object storage client
+ */
 public interface ObjectStorageClient {
+
+    /**
+     * @return the name of this object storage provider
+     */
+    String getName();
+
+    /**
+     *
+     * @return the name of the bucket
+     */
+    String getBucketName();
 
     /**
      * @return an {@link List<StorageObject>}.
@@ -93,4 +106,8 @@ public interface ObjectStorageClient {
      */
     void delete(String objectName);
 
+    /**
+     * Terminate all connections and shut down this client
+     */
+    void close();
 }

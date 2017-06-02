@@ -12,7 +12,10 @@ import org.jclouds.openstack.swift.v1.SwiftApi;
 import org.jclouds.openstack.swift.v1.domain.SwiftObject;
 import org.jclouds.openstack.swift.v1.features.ContainerApi;
 import org.jclouds.openstack.swift.v1.features.ObjectApi;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -22,8 +25,21 @@ import java.util.Optional;
  * Created by jeroen on 14-12-16.
  */
 public class SwiftObjectStorageClient implements ObjectStorageClient {
-    private ObjectApi objectApi;
 
+    private static final Logger LOG = LoggerFactory.getLogger(SwiftObjectStorageClient.class);
+
+    private ObjectApi objectApi;
+    private String bucketName;
+
+    /**
+     * Create a new Swift client and setup connection
+     * @param authUrl
+     * @param userName
+     * @param password
+     * @param containerName
+     * @param regionName
+     * @param tenantName
+     */
     public SwiftObjectStorageClient(String authUrl, String userName, String password, String containerName, String regionName, String tenantName) {
         final SwiftApi swiftApi = ContextBuilder.newBuilder("openstack-swift")
                 .credentials(tenantName + ":" + userName, password)
@@ -32,15 +48,33 @@ public class SwiftObjectStorageClient implements ObjectStorageClient {
 
         final ContainerApi containerApi = swiftApi.getContainerApi(regionName);
 
-        if (containerApi.get(containerName) == null) {
-            if (!containerApi.create(containerName)) {
+        if (containerApi.get(containerName) == null && !containerApi.create(containerName)) {
                 throw new ObjectStorageClientException("Swift cannot create container: " + containerName);
-            }
         }
 
         objectApi = swiftApi.getObjectApi(regionName, containerName);
+        this.bucketName = containerName;
     }
 
+    /**
+     * @see ObjectStorageClient#getName()
+     */
+    @Override
+    public String getName() {
+        return "Swift";
+    }
+
+    /**
+     * @see ObjectStorageClient#getBucketName()
+     */
+    @Override
+    public String getBucketName() {
+        return bucketName;
+    }
+
+    /**
+     * @see ObjectStorageClient#list()
+     */
     @Override
     public List<StorageObject> list() {
         List<SwiftObject> results = objectApi.list();
@@ -51,6 +85,9 @@ public class SwiftObjectStorageClient implements ObjectStorageClient {
         return storageObjects;
     }
 
+    /**
+     * @see ObjectStorageClient#put(String, Payload)
+     */
     @Override
     public String put(String key, Payload value) {
         return objectApi.put(key, value);
@@ -58,24 +95,28 @@ public class SwiftObjectStorageClient implements ObjectStorageClient {
 
     private Optional<StorageObject> toStorageObject(SwiftObject so) {
         ObjectMetadata metadata = new ObjectMetadata();
-        so.getMetadata().entrySet().forEach(entry -> {
-            metadata.addMetaData(entry.getKey(), entry.getValue());
-        });
+        so.getMetadata().entrySet().forEach(entry -> metadata.addMetaData(entry.getKey(), entry.getValue()));
         return Optional.of(new StorageObject(so.getName(), so.getUri(), so.getLastModified(), metadata, so.getPayload()));
     }
 
+    /**
+     * @see ObjectStorageClient#put(StorageObject)
+     */
     @Override
     public String put(StorageObject storageObject) {
         return objectApi.put(storageObject.getName(), storageObject.getPayload());
     }
 
+    /**
+     * @see ObjectStorageClient#getWithoutBody(String)
+     */
     @Override
     public Optional<StorageObject> getWithoutBody(String objectName) {
         return toStorageObject(objectApi.getWithoutBody(objectName));
     }
 
     /**
-     * @see eu.europeana.features.ObjectStorageClient#get(String)
+     * @see ObjectStorageClient#get(String)
      */
     @Override
     public Optional<StorageObject> get(String objectName) {
@@ -83,7 +124,7 @@ public class SwiftObjectStorageClient implements ObjectStorageClient {
     }
 
     /**
-     * @see eu.europeana.features.ObjectStorageClient#get(String, boolean)
+     * @see ObjectStorageClient#get(String, boolean)
      */
     @Override
     public Optional<StorageObject> get(String objectName, boolean verify) throws ContentValidationException {
@@ -94,15 +135,32 @@ public class SwiftObjectStorageClient implements ObjectStorageClient {
     }
 
     /**
-     * @see eu.europeana.features.ObjectStorageClient#getContent(String)
+     * @see ObjectStorageClient#getContent(String)
      */
     @Override
     public byte[] getContent(String objectName) {
         return ((ByteArrayPayload) objectApi.get(objectName).getPayload()).getRawContent();
     }
 
+    /**
+     * @see ObjectStorageClient#delete(String)
+     */
     @Override
     public void delete(String objectName) {
         objectApi.delete(objectName);
+    }
+
+    /**
+     * @see ObjectStorageClient#close()
+     */
+    @Override
+    public void close() {
+        try {
+            LOG.info("Shutting down connections to " +this.getName()+ "...");
+            ((SwiftApi) objectApi).close();
+        } catch (IOException e) {
+            LOG.error("Error closing Swift client", e);
+        }
+
     }
 }
