@@ -1,10 +1,11 @@
 package eu.europeana.features;
 
 import com.amazonaws.regions.Regions;
-import com.amazonaws.services.kinesisanalytics.model.Input;
+import com.amazonaws.services.dynamodbv2.document.Expected;
 import com.amazonaws.services.s3.S3ClientOptions;
 import com.amazonaws.services.s3.model.Bucket;
-import eu.europeana.domain.ObjectMetadata;
+import com.amazonaws.services.s3.model.ObjectMetadata;
+import eu.europeana.domain.ContentValidationException;
 import eu.europeana.domain.StorageObject;
 import org.apache.commons.io.IOUtils;
 import org.jclouds.io.Payload;
@@ -13,7 +14,6 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,16 +22,13 @@ import org.testcontainers.containers.GenericContainer;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
-import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
-import java.util.stream.Collectors;
 
-import static java.lang.System.out;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -47,7 +44,7 @@ import static org.junit.Assert.assertTrue;
  */
 public class S3ObjectStorageClientTest {
 
-    private static Logger logger = LoggerFactory.getLogger(S3ObjectStorageClientTest.class);
+    private static final Logger LOG = LoggerFactory.getLogger(S3ObjectStorageClientTest.class);
 
     // docker configuration, doesn't work yet because of an issue to the Amazon Mock S3 container
     private static final String BUCKET_NAME = "europeana-sitemap-test";
@@ -59,6 +56,8 @@ public class S3ObjectStorageClientTest {
     private static int port;
     private static String host;
     private static boolean runInDocker = false; // for now set to false
+
+    private static final String TEST_BUCKET_NAME = "unit-test";
 
     private static final String TEST_OBJECT_NAME = "test-object";
     private static final String TEST_OBJECT_DATA = "object data";
@@ -123,6 +122,16 @@ public class S3ObjectStorageClientTest {
         }
     }
 
+
+    // TODO Fix test, for some reason we get a Access Denies when trying to list all buckets (or create a new bucket)
+    // This has probably to do with the way we connect to S3
+    //@Test
+    public void testListBuckets() {
+        for(Bucket bucket : client.listBuckets()) {
+            LOG.info("Bucket: "+bucket.getName());
+        }
+    }
+
     /**
      * Check if our default test object already exists, if so it's probably from a previous test so we delete it
      */
@@ -130,25 +139,41 @@ public class S3ObjectStorageClientTest {
         Optional<StorageObject> leftover = client.getWithoutBody(TEST_OBJECT_NAME);
         if (leftover.isPresent())
         {
-            logger.warn("Found previous test object, deleting it.");
+            LOG.warn("Found previous test object, deleting it.");
             client.delete(TEST_OBJECT_NAME);
         }
     }
 
-    private void testRetrieval() {
-        // retrieve with payload
+    /**
+     * We support 3 different methods to retrieve data, in this method we test all 3
+     * @throws eu.europeana.domain.ContentValidationException
+     */
+    private void testRetrieval() throws ContentValidationException {
+        // retrieve content as bytes
+        byte[] content = client.getContent(TEST_OBJECT_NAME);
+        assertNotNull(content);
+        assertEquals(TEST_OBJECT_DATA, new String(content));
+
+        // retrieve as storageobject without payload
+        Optional<StorageObject> storageObjectWithoutBody = client.getWithoutBody(TEST_OBJECT_NAME);
+        assertTrue(storageObjectWithoutBody.isPresent());
+        StorageObject storageObjectWithoutBodyValue = storageObjectWithoutBody.get();
+        assertEquals(TEST_OBJECT_NAME, storageObjectWithoutBodyValue.getName());
+        assertEquals(0, getRawContent(storageObjectWithoutBodyValue).length);
+
+        // retrieve as storageobject with payload without verification
         Optional<StorageObject> storageObject = client.get(TEST_OBJECT_NAME);
         assertTrue(storageObject.isPresent());
         StorageObject storageObjectValue = storageObject.get();
         assertEquals(TEST_OBJECT_NAME, storageObjectValue.getName());
         assertEquals(TEST_OBJECT_DATA, new String(getRawContent(storageObjectValue)));
 
-        // retrieve without payload
-        Optional<StorageObject> storageObjectWithoutBody = client.getWithoutBody(TEST_OBJECT_NAME);
+        // retrieve as storageobject with payload with verification
+        storageObject = client.get(TEST_OBJECT_NAME, true);
         assertTrue(storageObject.isPresent());
-        StorageObject storageObjectWithoutBodyValue = storageObjectWithoutBody.get();
-        assertEquals(TEST_OBJECT_NAME, storageObjectWithoutBodyValue.getName());
-        assertEquals(0, getRawContent(storageObjectWithoutBodyValue).length);
+        storageObjectValue = storageObject.get();
+        assertEquals(TEST_OBJECT_NAME, storageObjectValue.getName());
+        assertEquals(TEST_OBJECT_DATA, new String(getRawContent(storageObjectValue)));
 
         // check if we can find it in list of objects, this make take quite some time
         //assertTrue(client.list().stream().map(StorageObject::getName).collect(Collectors.toList()).contains(TEST_OBJECT_NAME));
@@ -158,7 +183,7 @@ public class S3ObjectStorageClientTest {
      * Tests if we can put (using key and payload value), get and delete a simple object properly
      */
     @Test
-    public void testUploadKeyPayload() {
+    public void testUploadKeyPayload() throws ContentValidationException {
         deleteOldTestObject();
 
         Payload payload = new ByteArrayPayload(TEST_OBJECT_DATA.getBytes());
@@ -178,7 +203,7 @@ public class S3ObjectStorageClientTest {
      * @throws URISyntaxException
      */
     @Test
-    public void testUploadStorageObject() throws MalformedURLException, URISyntaxException {
+    public void testUploadStorageObject() throws ContentValidationException, IOException, URISyntaxException {
         deleteOldTestObject();
 
         // save test object
@@ -195,15 +220,15 @@ public class S3ObjectStorageClientTest {
     }
 
     /**
-     * Does a stress test of puting, retrieving and deleting a small test object.
-     * Note that this may take a while (approx. 6 1/2 minute for 1000 times)
+     * Does a stress test of putting, retrieving and deleting a small test object.
+     * Note that this may take a while (approx. 6 1/2 minute for 1000 items)
      */
-    @Test(timeout=500000)
-    public void testStressUpload() throws MalformedURLException, URISyntaxException {
+    @Test (timeout=500000)
+    public void testStressUpload() throws ContentValidationException, IOException, URISyntaxException {
         deleteOldTestObject();
 
         final int TEST_SIZE = 100;
-        logger.info("Starting stress test with size "+TEST_SIZE);
+        LOG.info("Starting stress test with size "+TEST_SIZE);
         for (int i = 0; i < TEST_SIZE ; i++) {
             // alternate between key/value upload and storage object upload
             if (i % 2 == 0) {
@@ -213,7 +238,7 @@ public class S3ObjectStorageClientTest {
             }
             // provide feedback about progress
             if (i % 50 == 0) {
-                logger.info(String.format("%.1f", i * 100.0 / TEST_SIZE) +"%");
+                LOG.info(String.format("%.1f", i * 100.0 / TEST_SIZE) +"%");
             }
         }
     }
@@ -236,19 +261,19 @@ public class S3ObjectStorageClientTest {
      * This test may take some time, depending on how much data is present.
      */
     @Test
-    public void testList() {
+    public void testListObjects() {
         deleteOldTestObject();
 
         List<StorageObject> list = client.list();
         int count = list.size();
-        logger.info("Checking "+count+" storage objects...");
+        LOG.info("Checking "+count+" storage objects...");
         int i = 0;
         for (StorageObject so : list) {
             assertNotNull(so);
             // provide feedback about progress
             i++;
             if (i % 50 == 0) {
-                logger.info(String.format("%.1f", i * 100.0 / count) +"%");
+                LOG.info(String.format("%.1f", i * 100.0 / count) +"%");
             }
         }
 
