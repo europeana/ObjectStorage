@@ -26,21 +26,30 @@ import static com.amazonaws.util.DateUtils.cloneDate;
 /**
  * Represents the object metadata that is stored. This includes the standard HTTP headers (Content-Length, ETag, Content-MD5, etc.).
  */
-public class ObjectMetadata implements Cloneable, Serializable {
+public class ObjectMetadata implements Serializable {
 
-    public ObjectMetadata() {
-        metadata = new TreeMap<String, Object>(String.CASE_INSENSITIVE_ORDER);
-    }
-
-    public ObjectMetadata(Map<String, Object> metadata) {
-        this.metadata = metadata;
-    }
+    private static final long serialVersionUID = 309391172680920769L;
 
     /**
      * All other (non user custom) headers such as Content-Length, Content-Type,
      * etc.
      */
     private Map<String, Object> metadata;
+
+    /**
+     * Initialize a new objectmetadata
+     */
+    public ObjectMetadata() {
+        metadata = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+    }
+
+    /**
+     * Initialize a new objectmetadata
+     * @param metadata map containing key-object metadata
+     */
+    public ObjectMetadata(Map<String, Object> metadata) {
+        this.metadata = metadata;
+    }
 
     /**
      * For internal use only. Sets a specific metadata header value. Not
@@ -59,13 +68,15 @@ public class ObjectMetadata implements Cloneable, Serializable {
      * @return A map of the raw metadata/headers for the associated object.
      */
     public Map<String, Object> getRawMetadata() {
-        Map<String, Object> copy = new TreeMap<String, Object>(String.CASE_INSENSITIVE_ORDER);
+        Map<String, Object> copy = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         copy.putAll(metadata);
         return Collections.unmodifiableMap(copy);
     }
 
     /**
      * Returns the raw value of the metadata/headers for the specified key.
+     * @param key
+     * @return Object
      */
     public Object getRawMetadataValue(String key) {
         return metadata.get(key);
@@ -123,7 +134,9 @@ public class ObjectMetadata implements Cloneable, Serializable {
     public long getContentLength() {
         Long contentLength = (Long) metadata.get(Headers.CONTENT_LENGTH);
 
-        if (contentLength == null) return 0;
+        if (contentLength == null) {
+            return 0;
+        }
         return contentLength.longValue();
     }
 
@@ -477,8 +490,8 @@ public class ObjectMetadata implements Cloneable, Serializable {
     }
 
 
-    public void setETag(String ETag) {
-        metadata.put(Headers.ETAG, ETag);
+    public void setETag(String eTag) {
+        metadata.put(Headers.ETAG, eTag);
     }
 
 
@@ -510,6 +523,11 @@ public class ObjectMetadata implements Cloneable, Serializable {
         return range;
     }
 
+    /**
+     *
+     * @param key
+     * @param value
+     */
     public void addMetaData(String key, Object value) {
         metadata.entrySet().add(new Map.Entry<String, Object>() {
             @Override

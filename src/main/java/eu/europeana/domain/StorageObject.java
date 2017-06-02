@@ -50,8 +50,7 @@ public class StorageObject implements Comparable<StorageObject> {
      * @param metadata
      * @param payload
      */
-    public StorageObject(String name, URI uri, Date lastModified,
-                         ObjectMetadata metadata, Payload payload) {
+    public StorageObject(String name, URI uri, Date lastModified, ObjectMetadata metadata, Payload payload) {
         this.name = checkNotNull(name, "name");
         this.uri = checkNotNull(uri, "uri of %s", uri);
         if (metadata == null) {
@@ -62,6 +61,7 @@ public class StorageObject implements Comparable<StorageObject> {
             } else {
                 metadata.setContentLength(payload.getContentMetadata().getContentLength());
             }
+            metadata.setLastModified(lastModified);
         }
         this.metadata = metadata;
         this.payload = payload;
@@ -111,7 +111,7 @@ public class StorageObject implements Comparable<StorageObject> {
         if (this == object) {
             return true;
         }
-        if (object instanceof StorageObject) {
+        if (object != null && StorageObject.class.equals(object.getClass())) {
             final StorageObject that = StorageObject.class.cast(object);
             return equal(getName(), that.getName())
                     && equal(getUri(), that.getUri())

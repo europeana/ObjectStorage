@@ -260,7 +260,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
      */
     @Override
     public void close() {
-        LOG.info("Shutting down connections to " +this.getName()+ "...");
+        LOG.info("Shutting down connections to {} ...", this.getName());
         ((AmazonS3Client) client).shutdown();
     }
 

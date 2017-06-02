@@ -156,7 +156,7 @@ public class SwiftObjectStorageClient implements ObjectStorageClient {
     @Override
     public void close() {
         try {
-            LOG.info("Shutting down connections to " +this.getName()+ "...");
+            LOG.info("Shutting down connections to {} ...", this.getName());
             ((SwiftApi) objectApi).close();
         } catch (IOException e) {
             LOG.error("Error closing Swift client", e);
