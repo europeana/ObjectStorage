@@ -159,6 +159,8 @@ public class S3ObjectStorageClientTest {
         assertTrue(storageObjectWithoutBody.isPresent());
         StorageObject storageObjectWithoutBodyValue = storageObjectWithoutBody.get();
         assertEquals(TEST_OBJECT_NAME, storageObjectWithoutBodyValue.getName());
+        assertNotNull(storageObjectWithoutBodyValue.getETag());
+        assertNotNull(storageObjectWithoutBodyValue.getLastModified());
         assertEquals(0, getRawContent(storageObjectWithoutBodyValue).length);
 
         // retrieve as storageobject with payload without verification
@@ -166,6 +168,8 @@ public class S3ObjectStorageClientTest {
         assertTrue(storageObject.isPresent());
         StorageObject storageObjectValue = storageObject.get();
         assertEquals(TEST_OBJECT_NAME, storageObjectValue.getName());
+        assertNotNull(storageObjectValue.getETag());
+        assertNotNull(storageObjectValue.getLastModified());
         assertEquals(TEST_OBJECT_DATA, new String(getRawContent(storageObjectValue)));
 
         // retrieve as storageobject with payload with verification
@@ -173,6 +177,8 @@ public class S3ObjectStorageClientTest {
         assertTrue(storageObject.isPresent());
         storageObjectValue = storageObject.get();
         assertEquals(TEST_OBJECT_NAME, storageObjectValue.getName());
+        assertNotNull(storageObjectValue.getETag());
+        assertNotNull(storageObjectValue.getLastModified());
         assertEquals(TEST_OBJECT_DATA, new String(getRawContent(storageObjectValue)));
 
         // check if we can find it in list of objects, this make take quite some time
@@ -208,7 +214,7 @@ public class S3ObjectStorageClientTest {
 
         // save test object
         Payload payload = new ByteArrayPayload(TEST_OBJECT_DATA.getBytes());
-        StorageObject so = new StorageObject(TEST_OBJECT_NAME, new URL("http://www.europeana.eu/test/s3").toURI(), new Date(), null, payload);
+        StorageObject so = new StorageObject(TEST_OBJECT_NAME, new URL("http://www.europeana.eu/test/s3").toURI(), null, payload);
         String eid = client.put(so);
         assertNotNull(eid);
 
@@ -270,6 +276,9 @@ public class S3ObjectStorageClientTest {
         int i = 0;
         for (StorageObject so : list) {
             assertNotNull(so);
+            assertNotNull(so.getName());
+            assertNotNull(so.getLastModified());
+            assertNotNull(so.getETag());
             // provide feedback about progress
             i++;
             if (i % 50 == 0) {

@@ -110,7 +110,11 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
 
     private StorageObject toStorageObject(S3ObjectSummary so) {
         URI uri = getUri(so.getKey());
-        return new StorageObject(so.getKey(), uri, so.getLastModified(), null, null);
+        ObjectMetadata metadata = new ObjectMetadata();
+        metadata.setLastModified(so.getLastModified());
+        metadata.setETag(so.getETag());
+        metadata.setContentLength(so.getSize());
+        return new StorageObject(so.getKey(), uri, metadata, null);
     }
 
     private URI getUri(String key) {
@@ -292,7 +296,6 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
 
             result = new StorageObject(key,
                     getUri(key),
-                    objectMetadata.getLastModified(),
                     objectMetadata,
                     content);
         } catch (IOException e){

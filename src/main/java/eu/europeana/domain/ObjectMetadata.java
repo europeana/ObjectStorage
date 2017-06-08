@@ -513,7 +513,7 @@ public class ObjectMetadata implements Serializable {
         if (contentRange != null) {
             String[] tokens = contentRange.split("[ -/]+");
             try {
-                range = new Long[]{Long.parseLong(tokens[1]), Long.parseLong(tokens[2])};
+                range = new Long[]{Long.valueOf(tokens[1]), Long.valueOf(tokens[2])};
             } catch (NumberFormatException nfe) {
                 throw new ObjectStorageClientException(
                         "Unable to parse content range. Header 'Content-Range' has corrupted data" + nfe.getMessage(),

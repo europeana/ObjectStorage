@@ -80,7 +80,7 @@ public class SwiftObjectStorageClient implements ObjectStorageClient {
         List<SwiftObject> results = objectApi.list();
         ArrayList<StorageObject> storageObjects = new ArrayList<>();
         for (SwiftObject so : results) {
-            storageObjects.add(toStorageObject(so).get());
+            storageObjects.add(toStorageObject(so));
         }
         return storageObjects;
     }
@@ -93,10 +93,10 @@ public class SwiftObjectStorageClient implements ObjectStorageClient {
         return objectApi.put(key, value);
     }
 
-    private Optional<StorageObject> toStorageObject(SwiftObject so) {
+    private StorageObject toStorageObject(SwiftObject so) {
         ObjectMetadata metadata = new ObjectMetadata();
         so.getMetadata().entrySet().forEach(entry -> metadata.addMetaData(entry.getKey(), entry.getValue()));
-        return Optional.of(new StorageObject(so.getName(), so.getUri(), so.getLastModified(), metadata, so.getPayload()));
+        return new StorageObject(so.getName(), so.getUri(), metadata, so.getPayload());
     }
 
     /**
@@ -112,7 +112,7 @@ public class SwiftObjectStorageClient implements ObjectStorageClient {
      */
     @Override
     public Optional<StorageObject> getWithoutBody(String objectName) {
-        return toStorageObject(objectApi.getWithoutBody(objectName));
+        return Optional.of(toStorageObject(objectApi.getWithoutBody(objectName)));
     }
 
     /**
@@ -120,7 +120,7 @@ public class SwiftObjectStorageClient implements ObjectStorageClient {
      */
     @Override
     public Optional<StorageObject> get(String objectName) {
-        return toStorageObject(objectApi.get(objectName));
+        return Optional.of(toStorageObject(objectApi.get(objectName)));
     }
 
     /**
@@ -131,7 +131,7 @@ public class SwiftObjectStorageClient implements ObjectStorageClient {
         if (verify) {
             throw new IllegalStateException("Verification not implemented yet");
         }
-        return toStorageObject(objectApi.get(objectName));
+        return Optional.of(toStorageObject(objectApi.get(objectName)));
     }
 
     /**
