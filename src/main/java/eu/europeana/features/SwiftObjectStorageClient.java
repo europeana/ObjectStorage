@@ -86,6 +86,16 @@ public class SwiftObjectStorageClient implements ObjectStorageClient {
     }
 
     /**
+     * This method is not recommended as it is inefficient. Better try to retrieve the object directly. If it fails
+     * then the object is not available.
+     * @see ObjectStorageClient#isAvailable(String)
+     */
+    @Override
+    public boolean isAvailable(String id) {
+        return (objectApi.getWithoutBody(id) != null);
+    }
+
+    /**
      * @see ObjectStorageClient#put(String, Payload)
      */
     @Override
@@ -140,6 +150,16 @@ public class SwiftObjectStorageClient implements ObjectStorageClient {
     @Override
     public byte[] getContent(String objectName) {
         return ((ByteArrayPayload) objectApi.get(objectName).getPayload()).getRawContent();
+    }
+
+    @Override
+    public ObjectMetadata getMetaData(String objectName) {
+        SwiftObject swiftObject = objectApi.getWithoutBody(objectName);
+        ObjectMetadata result = new ObjectMetadata();
+
+        result.setETag(swiftObject.getETag());
+        result.setLastModified(swiftObject.getLastModified());
+        return result;
     }
 
     /**

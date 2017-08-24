@@ -60,10 +60,18 @@ public class S3ObjectStorageClientTest {
     private static final String TEST_BUCKET_NAME = "unit-test";
 
     private static final String TEST_OBJECT_NAME = "test-object";
-    private static final String TEST_OBJECT_DATA = "object data";
+    private static final String TEST_OBJECT_DATA = "This is just some text...";
     private static final String TEST_OBJECT_DATA_MD5 = "hfMGNWAtwJvYWVem6CosIQ==";
 
     private static S3ObjectStorageClient client;
+
+    // we time the various retrieval methods to see which is fastest
+    private static long nrItems = 0;
+    private static long timingContent = 0;
+    private static long timingMetadata = 0;
+    private static long timingSONoPayload = 0;
+    private static long timingSOPayloadVerify = 0;
+    private static long timingSOPayloadNoVerify = 0;
 
     @BeforeClass
     public static void initClientAndTestServer() throws IOException {
@@ -135,12 +143,11 @@ public class S3ObjectStorageClientTest {
     /**
      * Check if our default test object already exists, if so it's probably from a previous test so we delete it
      */
-    private void deleteOldTestObject() {
-        Optional<StorageObject> leftover = client.getWithoutBody(TEST_OBJECT_NAME);
-        if (leftover.isPresent())
+    private void deleteOldTestObject(String id) {
+        if (client.isAvailable(id))
         {
             LOG.warn("Found previous test object, deleting it.");
-            client.delete(TEST_OBJECT_NAME);
+            client.delete(id);
         }
     }
 
@@ -148,41 +155,66 @@ public class S3ObjectStorageClientTest {
      * We support 3 different methods to retrieve data, in this method we test all 3
      * @throws eu.europeana.domain.ContentValidationException
      */
-    private void testRetrieval() throws ContentValidationException {
+    private void testRetrieval(String id) throws ContentValidationException {
+
+        long start;
+        Optional<StorageObject> storageObject;
+        StorageObject storageObjectValue;
+        assertTrue("Can't test retrieval of object that is not available", client.isAvailable(id));
+
         // retrieve content as bytes
-        byte[] content = client.getContent(TEST_OBJECT_NAME);
+        start = System.nanoTime();
+        byte[] content = client.getContent(id);
+        timingContent += (System.nanoTime() - start);
+
         assertNotNull(content);
         assertEquals(TEST_OBJECT_DATA, new String(content));
 
+        // retrieve metadata directly
+        start = System.nanoTime();
+        eu.europeana.domain.ObjectMetadata metadata = client.getMetaData(id);
+        timingMetadata += (System.nanoTime() - start);
+
+        assertNotNull(metadata);
+
         // retrieve as storageobject without payload
-        Optional<StorageObject> storageObjectWithoutBody = client.getWithoutBody(TEST_OBJECT_NAME);
+        start = System.nanoTime();
+        Optional<StorageObject> storageObjectWithoutBody = client.getWithoutBody(id);
+        timingSONoPayload += (System.nanoTime() - start);
+
         assertTrue(storageObjectWithoutBody.isPresent());
-        StorageObject storageObjectWithoutBodyValue = storageObjectWithoutBody.get();
-        assertEquals(TEST_OBJECT_NAME, storageObjectWithoutBodyValue.getName());
-        assertNotNull(storageObjectWithoutBodyValue.getETag());
-        assertNotNull(storageObjectWithoutBodyValue.getLastModified());
-        assertEquals(0, getRawContent(storageObjectWithoutBodyValue).length);
+        storageObjectValue = storageObjectWithoutBody.get();
+        assertEquals(id, storageObjectValue.getName());
+        assertNotNull(storageObjectValue.getETag());
+        assertNotNull(storageObjectValue.getLastModified());
+        assertEquals(0, getRawContent(storageObjectValue).length);
 
         // retrieve as storageobject with payload without verification
-        Optional<StorageObject> storageObject = client.get(TEST_OBJECT_NAME);
+        start = System.nanoTime();
+        storageObject = client.get(id);
+        timingSOPayloadNoVerify += (System.nanoTime() - start);
+
         assertTrue(storageObject.isPresent());
-        StorageObject storageObjectValue = storageObject.get();
-        assertEquals(TEST_OBJECT_NAME, storageObjectValue.getName());
+        storageObjectValue = storageObject.get();
+        assertEquals(id, storageObjectValue.getName());
         assertNotNull(storageObjectValue.getETag());
         assertNotNull(storageObjectValue.getLastModified());
         assertEquals(TEST_OBJECT_DATA, new String(getRawContent(storageObjectValue)));
 
         // retrieve as storageobject with payload with verification
-        storageObject = client.get(TEST_OBJECT_NAME, true);
+        start = System.nanoTime();
+        storageObject = client.get(id, true);
         assertTrue(storageObject.isPresent());
+        timingSOPayloadVerify += (System.nanoTime() - start);
+
         storageObjectValue = storageObject.get();
-        assertEquals(TEST_OBJECT_NAME, storageObjectValue.getName());
+        assertEquals(id, storageObjectValue.getName());
         assertNotNull(storageObjectValue.getETag());
         assertNotNull(storageObjectValue.getLastModified());
         assertEquals(TEST_OBJECT_DATA, new String(getRawContent(storageObjectValue)));
 
         // check if we can find it in list of objects, this make take quite some time
-        //assertTrue(client.list().stream().map(StorageObject::getName).collect(Collectors.toList()).contains(TEST_OBJECT_NAME));
+        //assertTrue(client.list().stream().map(StorageObject::getName).collect(Collectors.toList()).contains(id));
     }
 
     /**
@@ -190,17 +222,17 @@ public class S3ObjectStorageClientTest {
      */
     @Test
     public void testUploadKeyPayload() throws ContentValidationException {
-        deleteOldTestObject();
+        deleteOldTestObject(TEST_OBJECT_NAME);
 
         Payload payload = new ByteArrayPayload(TEST_OBJECT_DATA.getBytes());
         String eid = client.put(TEST_OBJECT_NAME, payload);
         assertNotNull(eid);
 
-        testRetrieval();
+        testRetrieval(TEST_OBJECT_NAME);
 
         // delete the object
         client.delete(TEST_OBJECT_NAME);
-        assertFalse(client.get(TEST_OBJECT_NAME).isPresent());
+        assertFalse(client.isAvailable(TEST_OBJECT_NAME));
     }
 
     /**
@@ -210,7 +242,7 @@ public class S3ObjectStorageClientTest {
      */
     @Test
     public void testUploadStorageObject() throws ContentValidationException, IOException, URISyntaxException {
-        deleteOldTestObject();
+        deleteOldTestObject(TEST_OBJECT_NAME);
 
         // save test object
         Payload payload = new ByteArrayPayload(TEST_OBJECT_DATA.getBytes());
@@ -218,20 +250,20 @@ public class S3ObjectStorageClientTest {
         String eid = client.put(so);
         assertNotNull(eid);
 
-        testRetrieval();
+        testRetrieval(TEST_OBJECT_NAME);
 
         // delete the object
         client.delete(TEST_OBJECT_NAME);
-        assertFalse(client.get(TEST_OBJECT_NAME).isPresent());
+        assertFalse(client.isAvailable(TEST_OBJECT_NAME));
     }
 
     /**
      * Does a stress test of putting, retrieving and deleting a small test object.
-     * Note that this may take a while (approx. 6 1/2 minute for 1000 items)
+     * Note that this may take a while (approx. 4 minutes for 1000 items)
      */
     @Test (timeout=500000)
     public void testStressUpload() throws ContentValidationException, IOException, URISyntaxException {
-        deleteOldTestObject();
+        deleteOldTestObject(TEST_OBJECT_NAME);
 
         final int TEST_SIZE = 100;
         LOG.info("Starting stress test with size "+TEST_SIZE);
@@ -252,13 +284,19 @@ public class S3ObjectStorageClientTest {
     //TODO test metadata check(length header has to be set)
 
     private byte[] getRawContent(StorageObject storageObject) {
-        return ((ByteArrayPayload) storageObject.getPayload()).getRawContent();
+        if (storageObject.getPayload() != null) {
+            return ((ByteArrayPayload) storageObject.getPayload()).getRawContent();
+        }
+        return new byte[0];
     }
 
-
+    /**
+     * Test if storageobjects confirm that an object is not present and if the isAvailable method returns false as expected
+     */
     @Test
     public void testStorageObjectDoesNotExist() {
-        Optional<StorageObject> storageObject = client.getWithoutBody("test");
+        assertFalse(client.isAvailable("NON_EXISTING_ID"));
+        Optional<StorageObject> storageObject = client.getWithoutBody("NON_EXISTING_ID");
         assertFalse(storageObject.isPresent());
     }
 
@@ -268,7 +306,7 @@ public class S3ObjectStorageClientTest {
      */
     @Test
     public void testListObjects() {
-        deleteOldTestObject();
+        deleteOldTestObject(TEST_OBJECT_NAME);
 
         List<StorageObject> list = client.list();
         int count = list.size();
@@ -301,6 +339,18 @@ public class S3ObjectStorageClientTest {
         Optional<StorageObject> storageObject = client.get("europeana-sitemap-hashed-blue.xml?from=179999&to=224999");
         String rawContent = new String(getRawContent(storageObject.get()));
         System.out.println(rawContent);
+    }
+
+//
+
+    @AfterClass
+    public static void printTimings() {
+        LOG.info("Time spend on retrieval of {} items...", nrItems);
+        LOG.info("  Content directly                      : {} ", timingContent/1000000);
+        LOG.info("  Metadata directly                     : {} ", timingMetadata/1000000);
+        LOG.info("  StorageObject no payload              : {} ", timingSONoPayload/1000000);
+        LOG.info("  StorageObject payload, no verification: {} ", timingSOPayloadNoVerify/1000000);
+        LOG.info("  StorageObject payload, verification   : {} ", timingSOPayloadVerify/1000000);
     }
 
 }

@@ -18,6 +18,7 @@ package eu.europeana.features;
 
 
 import eu.europeana.domain.ContentValidationException;
+import eu.europeana.domain.ObjectMetadata;
 import eu.europeana.domain.StorageObject;
 import org.jclouds.io.Payload;
 
@@ -46,13 +47,20 @@ public interface ObjectStorageClient {
     List<StorageObject> list();
 
     /**
+     * Check if an object with the provided id exists
+     * @param id
+     * @return true if it exists, false if it does not exist
+     */
+    boolean isAvailable(String id);
+
+    /**
      * Creates or updates a {@link StorageObject}.
      *
-     * @param key   corresponds to {@link StorageObject#getName()}.
+     * @param id  corresponds to {@link StorageObject#getName()}.
      * @param value corresponds to {@link StorageObject#getPayload()}.
      * @return {@link StorageObject#getETag()} of the object.
      */
-    String put(String key, Payload value);
+    String put(String id, Payload value);
 
     /**
      * Creates or updates a {@link StorageObject}.
@@ -98,6 +106,13 @@ public interface ObjectStorageClient {
      * @return byte array representing the retrieved object, or empty byte array if no object was retrieved
      */
     byte[] getContent(String objectName);
+
+    /**
+     * Get the metadata of the specified object
+     * @param objectName corresponds to {@link StorageObject#getName()}.
+     * @return ObjectMetadata of the requests object
+     */
+    ObjectMetadata getMetaData(String objectName);
 
     /**
      * Deletes an object, if present.

@@ -104,6 +104,14 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         return storageObjects;
     }
 
+    /**
+     * @see ObjectStorageClient#isAvailable(String)
+     */
+    @Override
+    public boolean isAvailable(String id) {
+        return client.doesObjectExist(bucketName, id);
+    }
+
     public void setEndpoint(String endpoint) {
         client.setEndpoint(endpoint);
     }
@@ -118,7 +126,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     }
 
     private URI getUri(String key) {
-        String bucketLocation = client.getBucketLocation(bucketName);
+        String bucketLocation = client.getRegionName();
         return URI.create(bucketLocation + "/" + key);
     }
 
@@ -251,6 +259,16 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     }
 
     /**
+     * @see eu.europeana.features.ObjectStorageClient#getMetaData(String)
+     */
+    @Override
+    public ObjectMetadata getMetaData(String id) {
+        com.amazonaws.services.s3.model.ObjectMetadata s3data = client.getObjectMetadata(bucketName, id);
+        ObjectMetadata result = new ObjectMetadata(s3data.getRawMetadata());
+        return result;
+    }
+
+    /**
      * @see ObjectStorageClient#delete(String)
      */
     @Override
@@ -271,37 +289,33 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     /**
      * Retrieve an object and return all information as a {@link StorageObject}}
      * @param id
-     * @param getContent if false only header information is retrieved, if true payload is retrieved as well
+     * @param getContent, if false then only metadata is retrieved
+     * @param verify if true then the MD5 hash of the content will be verified to check if it was downloaded correctly
      * @return
      */
     private StorageObject retrieveAsStorageObject(String id, boolean getContent, boolean verify) throws ContentValidationException {
         StorageObject result = null;
-        try (S3Object object = client.getObject(bucketName, id)) {
-            String key = object.getKey();
-            ObjectMetadata objectMetadata = new ObjectMetadata(object.getObjectMetadata().getRawMetadata());
+        if (getContent) {
+            try (S3Object object = client.getObject(bucketName, id)) {
+                ObjectMetadata objectMetadata = new ObjectMetadata(object.getObjectMetadata().getRawMetadata());
+                ByteArrayPayload content;
+                try (S3ObjectInputStream contentStream = object.getObjectContent()) {
+                    if (verify) {
+                        content = readAndVerifyContent(contentStream, BinaryUtils.fromHex(objectMetadata.getETag()));
 
-            ByteArrayPayload content = null;
-
-            if (getContent) {
-                S3ObjectInputStream contentStream = object.getObjectContent();
-                if (verify) {
-                    content = readAndVerifyContent(contentStream, BinaryUtils.fromHex(objectMetadata.getETag()));
-                } else {
-                    content = new ByteArrayPayload(IOUtils.toByteArray(contentStream));
+                    } else {
+                        content = new ByteArrayPayload(IOUtils.toByteArray(contentStream));
+                    }
+                    content.close();
                 }
-            } else {
-                content = new ByteArrayPayload(new byte[0]);
+                result = new StorageObject(object.getKey(), getUri(object.getKey()), objectMetadata, content);
+            } catch (IOException e) {
+                LOG.error("Error reading object content", e);
             }
-            content.close();
-
-            result = new StorageObject(key,
-                    getUri(key),
-                    objectMetadata,
-                    content);
-        } catch (IOException e){
-            LOG.error("Error reading object content", e);
+        } else {
+            ObjectMetadata metadata = getMetaData(id);
+            result = new StorageObject(id, getUri(id), metadata, null);
         }
-
         return result;
     }
 
@@ -365,7 +379,12 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         return client.listBuckets();
     }
 
-    public void deleteBucket(String bucket) { client.deleteBucket(bucket);
+    /**
+     * Delete a bucket (requires admin privileges)
+     * @param bucket
+     */
+    public void deleteBucket(String bucket) {
+        client.deleteBucket(bucket);
     }
 
     public void setS3ClientOptions(S3ClientOptions s3ClientOptions) {
