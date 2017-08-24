@@ -61,7 +61,7 @@ public class S3ObjectStorageClientTest {
 
     private static final String TEST_OBJECT_NAME = "test-object";
     private static final String TEST_OBJECT_DATA = "This is just some text...";
-    private static final String TEST_OBJECT_DATA_MD5 = "hfMGNWAtwJvYWVem6CosIQ==";
+    //private static final String TEST_OBJECT_DATA_MD5 = "hfMGNWAtwJvYWVem6CosIQ==";
 
     private static S3ObjectStorageClient client;
 
@@ -158,8 +158,8 @@ public class S3ObjectStorageClientTest {
     private void testRetrieval(String id) throws ContentValidationException {
 
         long start;
-        Optional<StorageObject> storageObject;
-        StorageObject storageObjectValue;
+        Optional<StorageObject> optional;
+        StorageObject storageObject;
         assertTrue("Can't test retrieval of object that is not available", client.isAvailable(id));
 
         // retrieve content as bytes
@@ -179,42 +179,43 @@ public class S3ObjectStorageClientTest {
 
         // retrieve as storageobject without payload
         start = System.nanoTime();
-        Optional<StorageObject> storageObjectWithoutBody = client.getWithoutBody(id);
+        optional = client.getWithoutBody(id);
         timingSONoPayload += (System.nanoTime() - start);
 
-        assertTrue(storageObjectWithoutBody.isPresent());
-        storageObjectValue = storageObjectWithoutBody.get();
-        assertEquals(id, storageObjectValue.getName());
-        assertNotNull(storageObjectValue.getETag());
-        assertNotNull(storageObjectValue.getLastModified());
-        assertEquals(0, getRawContent(storageObjectValue).length);
+        assertTrue(optional.isPresent());
+        storageObject = optional.get();
+        assertEquals(id, storageObject.getName());
+        assertNotNull(storageObject.getETag());
+        assertNotNull(storageObject.getLastModified());
+        assertEquals(0, getRawContent(storageObject).length);
 
         // retrieve as storageobject with payload without verification
         start = System.nanoTime();
-        storageObject = client.get(id);
+        optional = client.get(id);
         timingSOPayloadNoVerify += (System.nanoTime() - start);
 
-        assertTrue(storageObject.isPresent());
-        storageObjectValue = storageObject.get();
-        assertEquals(id, storageObjectValue.getName());
-        assertNotNull(storageObjectValue.getETag());
-        assertNotNull(storageObjectValue.getLastModified());
-        assertEquals(TEST_OBJECT_DATA, new String(getRawContent(storageObjectValue)));
+        assertTrue(optional.isPresent());
+        storageObject = optional.get();
+        assertEquals(id, storageObject.getName());
+        assertNotNull(storageObject.getETag());
+        assertNotNull(storageObject.getLastModified());
+        assertEquals(TEST_OBJECT_DATA, new String(getRawContent(storageObject)));
 
         // retrieve as storageobject with payload with verification
         start = System.nanoTime();
-        storageObject = client.get(id, true);
-        assertTrue(storageObject.isPresent());
+        optional = client.get(id, true);
         timingSOPayloadVerify += (System.nanoTime() - start);
 
-        storageObjectValue = storageObject.get();
-        assertEquals(id, storageObjectValue.getName());
-        assertNotNull(storageObjectValue.getETag());
-        assertNotNull(storageObjectValue.getLastModified());
-        assertEquals(TEST_OBJECT_DATA, new String(getRawContent(storageObjectValue)));
+        assertTrue(optional.isPresent());
+        storageObject = optional.get();
+        assertEquals(id, storageObject.getName());
+        assertNotNull(storageObject.getETag());
+        assertNotNull(storageObject.getLastModified());
+        assertEquals(TEST_OBJECT_DATA, new String(getRawContent(storageObject)));
 
         // check if we can find it in list of objects, this make take quite some time
         //assertTrue(client.list().stream().map(StorageObject::getName).collect(Collectors.toList()).contains(id));
+        nrItems++;
     }
 
     /**
