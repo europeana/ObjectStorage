@@ -8,7 +8,7 @@
     </parent>
     <groupId>eu.europeana</groupId>
     <artifactId>object-storage</artifactId>
-    <version>1.4-SNAPSHOT</version>
+    <version>1.5-SNAPSHOT</version>
     <dependencies>
         <dependency>
             <groupId>org.apache.jclouds</groupId>
