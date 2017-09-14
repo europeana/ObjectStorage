@@ -5,6 +5,8 @@ import eu.europeana.domain.ContentValidationException;
 import eu.europeana.domain.ObjectMetadata;
 import eu.europeana.domain.ObjectStorageClientException;
 import eu.europeana.domain.StorageObject;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.jclouds.ContextBuilder;
 import org.jclouds.io.Payload;
 import org.jclouds.io.payloads.ByteArrayPayload;
@@ -12,8 +14,6 @@ import org.jclouds.openstack.swift.v1.SwiftApi;
 import org.jclouds.openstack.swift.v1.domain.SwiftObject;
 import org.jclouds.openstack.swift.v1.features.ContainerApi;
 import org.jclouds.openstack.swift.v1.features.ObjectApi;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -26,7 +26,7 @@ import java.util.Optional;
  */
 public class SwiftObjectStorageClient implements ObjectStorageClient {
 
-    private static final Logger LOG = LoggerFactory.getLogger(SwiftObjectStorageClient.class);
+    private static final Logger LOG = LogManager.getLogger(SwiftObjectStorageClient.class);
 
     private ObjectApi objectApi;
     private String bucketName;

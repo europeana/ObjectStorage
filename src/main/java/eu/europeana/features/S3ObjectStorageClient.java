@@ -14,10 +14,10 @@ import eu.europeana.domain.ContentValidationException;
 import eu.europeana.domain.ObjectMetadata;
 import eu.europeana.domain.ObjectStorageClientException;
 import eu.europeana.domain.StorageObject;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.jclouds.io.Payload;
 import org.jclouds.io.payloads.ByteArrayPayload;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -37,7 +37,7 @@ import java.util.Optional;
  */
 public class S3ObjectStorageClient implements ObjectStorageClient {
 
-    private static final Logger LOG = LoggerFactory.getLogger(S3ObjectStorageClient.class);
+    private static final Logger LOG = LogManager.getLogger(S3ObjectStorageClient.class);
 
     private static final String ERROR_MSG_RETRIEVE = "Error retrieving storage object ";
 

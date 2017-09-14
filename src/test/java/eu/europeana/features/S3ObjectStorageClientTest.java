@@ -1,13 +1,11 @@
 package eu.europeana.features;
 
 import com.amazonaws.regions.Regions;
-import com.amazonaws.services.dynamodbv2.document.Expected;
-import com.amazonaws.services.s3.S3ClientOptions;
 import com.amazonaws.services.s3.model.Bucket;
-import com.amazonaws.services.s3.model.ObjectMetadata;
 import eu.europeana.domain.ContentValidationException;
 import eu.europeana.domain.StorageObject;
-import org.apache.commons.io.IOUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.jclouds.io.Payload;
 import org.jclouds.io.payloads.ByteArrayPayload;
 import org.junit.After;
@@ -15,16 +13,12 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.GenericContainer;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
@@ -44,7 +38,7 @@ import static org.junit.Assert.assertTrue;
  */
 public class S3ObjectStorageClientTest {
 
-    private static final Logger LOG = LoggerFactory.getLogger(S3ObjectStorageClientTest.class);
+    private static final Logger LOG = LogManager.getLogger(S3ObjectStorageClientTest.class);
 
     // docker configuration, doesn't work yet because of an issue to the Amazon Mock S3 container
     private static final String BUCKET_NAME = "europeana-sitemap-test";
@@ -52,7 +46,7 @@ public class S3ObjectStorageClientTest {
     private static final String CLIENT_KEY = "AKIAIOSFODNN7EXAMPLE";
     private static final String SECRET_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
     private static final String REGION = Regions.EU_CENTRAL_1.getName();
-    private static GenericContainer s3server;
+    //private static GenericContainer s3server;
     private static int port;
     private static String host;
     private static boolean runInDocker = false; // for now set to false
@@ -77,12 +71,12 @@ public class S3ObjectStorageClientTest {
     public static void initClientAndTestServer() throws IOException {
         //TODO fix Amazon Mock S3 Container setup
         if (runInDocker) {
-            s3server = new GenericContainer("meteogroup/s3mock:latest")
-                    .withExposedPorts(EXPOSED_PORT);
-            s3server.start();
-            port = s3server.getMappedPort(EXPOSED_PORT);
-            host = s3server.getContainerIpAddress();
-            client = new S3ObjectStorageClient(CLIENT_KEY, SECRET_KEY, BUCKET_NAME, "http://" + host + ":" + port + "/s3", new S3ClientOptions().withPathStyleAccess(true));
+//            s3server = new GenericContainer("meteogroup/s3mock:latest")
+//                    .withExposedPorts(EXPOSED_PORT);
+//            s3server.start();
+//            port = s3server.getMappedPort(EXPOSED_PORT);
+//            host = s3server.getContainerIpAddress();
+//            client = new S3ObjectStorageClient(CLIENT_KEY, SECRET_KEY, BUCKET_NAME, "http://" + host + ":" + port + "/s3", new S3ClientOptions().withPathStyleAccess(true));
         } else {
             Properties prop = loadAndCheckLoginProperties();
             client = new S3ObjectStorageClient(prop.getProperty("s3.key"), prop.getProperty("s3.secret"), prop.getProperty("s3.region"), prop.getProperty("s3.bucket"));
@@ -91,9 +85,7 @@ public class S3ObjectStorageClientTest {
 
     private static Properties loadAndCheckLoginProperties() throws IOException {
         Properties prop = new Properties();
-        InputStream in = null;
-        try {
-            in = Thread.currentThread().getContextClassLoader().getResourceAsStream("objectstorage.properties");
+        try (InputStream in = Thread.currentThread().getContextClassLoader().getResourceAsStream("objectstorage.properties")) {
             if (in == null) {
                 throw new RuntimeException("Please provide objectstorage.properties file with login details");
             }
@@ -103,8 +95,6 @@ public class S3ObjectStorageClientTest {
             if (bucketName != null && bucketName.contains("production")) {
                 throw new RuntimeException("Do not use production settings for unit tests!");
             }
-        } finally {
-            IOUtils.closeQuietly(in);
         }
         return prop;
     }
@@ -112,7 +102,7 @@ public class S3ObjectStorageClientTest {
     @AfterClass
     public static void tearDown() throws Exception {
         if (runInDocker) {
-            s3server.stop();
+            //s3server.stop();
         }
     }
 
