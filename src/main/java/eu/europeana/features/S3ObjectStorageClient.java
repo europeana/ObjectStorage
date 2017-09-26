@@ -284,6 +284,8 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     public void close() {
         LOG.info("Shutting down connections to {} ...", this.getName());
         ((AmazonS3Client) client).shutdown();
+        // see also https://stackoverflow.com/questions/18069042/spring-mvc-webapp-schedule-java-sdk-http-connection-reaper-failed-to-stop
+        com.amazonaws.http.IdleConnectionReaper.shutdown();
     }
 
     /**
