@@ -52,16 +52,16 @@ public class StorageObject implements Comparable<StorageObject> {
     public StorageObject(String name, URI uri, ObjectMetadata metadata, Payload payload) {
         this.name = checkNotNull(name, "name");
         this.uri = checkNotNull(uri, "uri of %s", uri);
-        if (metadata == null) {
-            metadata = new ObjectMetadata();
+        this.metadata = metadata;
+        if (this.metadata == null) {
+            this.metadata = new ObjectMetadata();
             // we want to at least set the content length, to optimize transfer speed
             if (payload == null) {
-                metadata.setContentLength(0);
+                this.metadata.setContentLength(0);
             } else {
-                metadata.setContentLength(payload.getContentMetadata().getContentLength());
+                this.metadata.setContentLength(payload.getContentMetadata().getContentLength());
             }
         }
-        this.metadata = metadata;
         this.payload = payload;
     }
 
@@ -109,7 +109,7 @@ public class StorageObject implements Comparable<StorageObject> {
         if (this == object) {
             return true;
         }
-        if (object != null && StorageObject.class.equals(object.getClass())) {
+        if (object != null && this.getClass() == object.getClass()) {
             final StorageObject that = StorageObject.class.cast(object);
             return equal(getName(), that.getName())
                     && equal(getUri(), that.getUri())

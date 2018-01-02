@@ -18,6 +18,7 @@ package eu.europeana.domain;
 import java.io.Serializable;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -40,7 +41,7 @@ public class ObjectMetadata implements Serializable {
      * Initialize a new objectmetadata
      */
     public ObjectMetadata() {
-        metadata = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        metadata = new HashMap<>();
     }
 
     /**

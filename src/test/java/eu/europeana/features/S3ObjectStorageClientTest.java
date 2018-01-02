@@ -243,6 +243,10 @@ public class S3ObjectStorageClientTest {
 
         testRetrieval(TEST_OBJECT_NAME);
 
+        // test StorageObject equals() function
+        StorageObject retrievedObject = client.get(TEST_OBJECT_NAME, true).get();
+        assertTrue(so.equals(retrievedObject));
+
         // delete the object
         client.delete(TEST_OBJECT_NAME);
         assertFalse(client.isAvailable(TEST_OBJECT_NAME));
