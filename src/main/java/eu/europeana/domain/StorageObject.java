@@ -45,13 +45,13 @@ public class StorageObject implements Comparable<StorageObject> {
     /**
      * Create a new storage object. If no metadata is provided a basic one will be generated
      * @param name required field
-     * @param uri required field
+     * @param uri
      * @param metadata
      * @param payload
      */
     public StorageObject(String name, URI uri, ObjectMetadata metadata, Payload payload) {
         this.name = checkNotNull(name, "name");
-        this.uri = checkNotNull(uri, "uri of %s", uri);
+        this.uri = uri;
         this.metadata = metadata;
         if (this.metadata == null) {
             this.metadata = new ObjectMetadata();
@@ -104,6 +104,13 @@ public class StorageObject implements Comparable<StorageObject> {
         return payload;
     }
 
+    /**
+     * Check if two objects are equal, based on the name, uri and ETag of the objects.
+     * Note that when you create a new object the uri and Etag may not be set yet (but will be set
+     * when the object is retrieved)
+     * @param object
+     * @return
+     */
     @Override
     public boolean equals(Object object) {
         if (this == object) {

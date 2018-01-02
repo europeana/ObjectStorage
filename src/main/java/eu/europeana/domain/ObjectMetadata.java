@@ -20,7 +20,6 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.TreeMap;
 
 import static com.amazonaws.util.DateUtils.cloneDate;
 
@@ -35,7 +34,7 @@ public class ObjectMetadata implements Serializable {
      * All other (non user custom) headers such as Content-Length, Content-Type,
      * etc.
      */
-    private Map<String, Object> metadata;
+    private HashMap<String, Object> metadata;
 
     /**
      * Initialize a new objectmetadata
@@ -49,7 +48,12 @@ public class ObjectMetadata implements Serializable {
      * @param metadata map containing key-object metadata
      */
     public ObjectMetadata(Map<String, Object> metadata) {
-        this.metadata = metadata;
+        if (metadata instanceof HashMap) {
+            this.metadata = (HashMap<String, Object>) metadata;
+        } else {
+            this.metadata = new HashMap<>();
+            this.metadata.putAll(metadata);
+        }
     }
 
     /**
@@ -69,7 +73,7 @@ public class ObjectMetadata implements Serializable {
      * @return A map of the raw metadata/headers for the associated object.
      */
     public Map<String, Object> getRawMetadata() {
-        Map<String, Object> copy = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        Map<String, Object> copy = new HashMap<>();
         copy.putAll(metadata);
         return Collections.unmodifiableMap(copy);
     }

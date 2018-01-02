@@ -243,10 +243,6 @@ public class S3ObjectStorageClientTest {
 
         testRetrieval(TEST_OBJECT_NAME);
 
-        // test StorageObject equals() function
-        StorageObject retrievedObject = client.get(TEST_OBJECT_NAME, true).get();
-        assertTrue(so.equals(retrievedObject));
-
         // delete the object
         client.delete(TEST_OBJECT_NAME);
         assertFalse(client.isAvailable(TEST_OBJECT_NAME));
@@ -296,6 +292,28 @@ public class S3ObjectStorageClientTest {
     }
 
     /**
+     * Test if the storageObject equals function works properly. Note that some of the information
+     * is only available after we saved an object
+     */
+    @Test
+    public void testStorageObjectEquals() {
+        deleteOldTestObject(TEST_OBJECT_NAME);
+
+        // save test object
+        Payload payload = new ByteArrayPayload(TEST_OBJECT_DATA.getBytes());
+        StorageObject original = new StorageObject(TEST_OBJECT_NAME, null, null, payload);
+        client.put(original);
+
+        StorageObject retrieved1 = client.get(TEST_OBJECT_NAME).get();
+        assertFalse(original.equals(retrieved1));
+        StorageObject retrieved2 = client.get(TEST_OBJECT_NAME).get();
+        assertTrue(retrieved1.equals(retrieved2));
+
+        // delete the object
+        client.delete(TEST_OBJECT_NAME);
+    }
+
+    /**
      * Simple test of listing all storage objects in the bucket.
      * This test may take some time, depending on how much data is present.
      */
@@ -335,8 +353,6 @@ public class S3ObjectStorageClientTest {
         String rawContent = new String(getRawContent(storageObject.get()));
         System.out.println(rawContent);
     }
-
-//
 
     @AfterClass
     public static void printTimings() {
