@@ -1,8 +1,12 @@
 package eu.europeana.features;
 
+import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
+import com.amazonaws.client.builder.AwsClientBuilder;
+import com.amazonaws.regions.Region;
+import com.amazonaws.regions.RegionImpl;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
@@ -32,8 +36,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Client for accessing objects stored on Amazon S3 service.
- * Created by jeroen on 14-12-16.
+ * Client for accessing objects stored on (Amazon or Bluemix or ...) S3 service.
+ * Created by jeroen on 14-12-16; adapted to IBM Bluemix S3 by Luthien, Jan 18
  */
 public class S3ObjectStorageClient implements ObjectStorageClient {
 
@@ -43,6 +47,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
 
     private AmazonS3 client;
     private String bucketName;
+    private boolean isBluemix = false;
 
     /**
      * Create a new S3 client
@@ -59,6 +64,29 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     }
 
     /**
+     * Create a new S3 client and specify an endpoint (bluemix). Calling this constructor sets the boolean isBlueMix
+     * to true; it is used to switch to the correct way of constructing the Object URI when using resource path
+     * addressing (used by Bluemix) instead of virtual host addressing (default usage with Amazon S3).
+     * Also note that the region parameter is superfluous, but I will maintain it for now in order to be able to
+     * overload the constructor (using 5 Strings, hence different from the other two)
+     * @param clientKey
+     * @param secretKey
+     * @param region
+     * @param bucketName
+     * @param endpoint
+     */
+    public S3ObjectStorageClient(String clientKey, String secretKey, String region, String bucketName, String endpoint) {
+        System.setProperty("com.amazonaws.sdk.disableDNSBuckets", "True");
+        S3ClientOptions opts = new S3ClientOptions().withPathStyleAccess(true);
+        client = new AmazonS3Client(new BasicAWSCredentials(clientKey, secretKey));
+        client.setS3ClientOptions(opts);
+        client.setEndpoint(endpoint);
+        this.bucketName = bucketName;
+        isBluemix = true;
+        LOG.info("Connected to Bluemix S3 bucket {}", bucketName);
+    }
+
+    /**
      * Create a new S3 client and specify an endpoint and options
      * @param clientKey
      * @param secretKey
@@ -71,14 +99,14 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         client.setS3ClientOptions(s3ClientOptions);
         client.setEndpoint(endpoint);
         this.bucketName = bucketName;
-        LOG.info("Connected to Amazon S3 bucket {}", bucketName);
+        LOG.info("Connected to S3 bucket {}", bucketName);
     }
 
     /**
      * @see ObjectStorageClient#getName()
      */
     @Override
-    public String getName() { return "Amazon S3"; }
+    public String getName() { return "S3"; }
 
     /**
      * @see ObjectStorageClient#getBucketName()
@@ -128,8 +156,12 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     }
 
     private URI getUri(String key) {
+        if (isBluemix) {
+            return URI.create(client.getUrl(bucketName, key).toString());
+        } else {
         String bucketLocation = client.getRegionName();
         return URI.create(bucketLocation + "/" + key);
+    }
     }
 
     /**

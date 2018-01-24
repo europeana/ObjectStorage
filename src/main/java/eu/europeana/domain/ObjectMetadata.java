@@ -113,27 +113,20 @@ public class ObjectMetadata implements Serializable {
     }
 
     /**
-     * <p>
      * Gets the Content-Length HTTP header indicating the size of the
      * associated object in bytes.
-     * </p>
-     * <p>
      * This field is required when uploading objects to the storage provider, but the ObjectStorageClient Java
      * client will automatically set it when working directly with files. When
      * uploading directly from a stream, set this field if
      * possible. Otherwise the client must buffer the entire stream in
      * order to calculate the content length before sending the data to
      * ObjectStorageClient.
-     * </p>
-     * <p>
-     * For more information on the Content-Length HTTP header, see <a
-     * href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13">
-     * http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13</a>
-     * </p>
+     *
+     * For more information on the Content-Length HTTP header, see
+     * http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
      *
      * @return The Content-Length HTTP header indicating the size of the
-     * associated object in bytes. Returns <code>null</code>
-     * if it hasn't been set yet.
+     * associated object in bytes. Returns null if it hasn't been set yet.
      * @see com.amazonaws.services.s3.model.ObjectMetadata#setContentLength(long)
      */
     public long getContentLength() {
@@ -162,23 +155,18 @@ public class ObjectMetadata implements Serializable {
     }
 
     /**
-     * <p>
      * Sets the Content-Length HTTP header indicating the size of the
      * associated object in bytes.
-     * </p>
-     * <p>
+     *
      * This field is required when uploading objects to S3, but the ObjectStorageClient Java
      * client will automatically set it when working directly with files. When
      * uploading directly from a stream, set this field if
      * possible. Otherwise the client must buffer the entire stream in
      * order to calculate the content length before sending the data to
      * ObjectStorageClient.
-     * </p>
-     * <p>
-     * For more information on the Content-Length HTTP header, see <a
-     * href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13">
-     * http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13</a>
-     * </p>
+     *
+     * For more information on the Content-Length HTTP header, see
+     * http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
      *
      * @param contentLength The Content-Length HTTP header indicating the size of the
      *                      associated object in bytes.
@@ -189,29 +177,23 @@ public class ObjectMetadata implements Serializable {
     }
 
     /**
-     * <p>
      * Gets the Content-Type HTTP header, which indicates the type of content
      * stored in the associated object. The value of this header is a standard
      * MIME type.
-     * </p>
-     * <p>
+     *
      * When uploading files, the ObjectStorageClient Java client will attempt to determine
      * the correct content type if one hasn't been set yet. Users are
      * responsible for ensuring a suitable content type is set when uploading
      * streams. If no content type is provided and cannot be determined by
      * the filename, the default content type, "application/octet-stream", will
      * be used.
-     * </p>
-     * <p>
-     * For more information on the Content-Type header, see <a
-     * href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.17">
-     * http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.17</a>
-     * </p>
+     *
+     * For more information on the Content-Type header, see
+     * http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.17
      *
      * @return The HTTP Content-Type header, indicating the type of content
-     * stored in the associated storage object. Returns <code>null</code>
-     * if it hasn't been
-     * set.
+     * stored in the associated storage object. Returns null
+     * if it hasn't been set.
      * @see com.amazonaws.services.s3.model.ObjectMetadata#setContentType(String)
      */
     public String getContentType() {
@@ -219,24 +201,19 @@ public class ObjectMetadata implements Serializable {
     }
 
     /**
-     * <p>
      * Sets the Content-Type HTTP header indicating the type of content
      * stored in the associated object. The value of this header is a standard
      * MIME type.
-     * </p>
-     * <p>
+     *
      * When uploading files, the ObjectStorageClient Java client will attempt to determine
      * the correct content type if one hasn't been set yet. Users are
      * responsible for ensuring a suitable content type is set when uploading
      * streams. If no content type is provided and cannot be determined by
      * the filename, the default content type "application/octet-stream" will
      * be used.
-     * </p>
-     * <p>
-     * For more information on the Content-Type header, see <a
-     * href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.17">
-     * http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.17</a>
-     * </p>
+     *
+     * For more information on the Content-Type header, see
+     * http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.17"
      *
      * @param contentType The HTTP Content-Type header indicating the type of content
      *                    stored in the associated storage object.
@@ -247,18 +224,14 @@ public class ObjectMetadata implements Serializable {
     }
 
     /**
-     * <p>
      * Gets the Content-Language HTTP header, which describes the natural language(s) of the
      * intended audience for the enclosed entity.
-     * </p>
-     * <p>
-     * For more information on the Content-Type header, see <a
-     * href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.17">
-     * http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.17</a>
-     * </p>
+     *
+     * For more information on the Content-Type header, see
+     * http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.17
      *
      * @return The HTTP Content-Language header, which describes the natural language(s) of the
-     * intended audience for the enclosed entity. Returns <code>null</code>
+     * intended audience for the enclosed entity. Returns null
      * if it hasn't been set.
      * @see com.amazonaws.services.s3.model.ObjectMetadata#setContentLanguage(String)
      */
@@ -267,15 +240,11 @@ public class ObjectMetadata implements Serializable {
     }
 
     /**
-     * <p>
      * Sets the Content-Language HTTP header which describes the natural language(s) of the
      * intended audience for the enclosed entity.
-     * </p>
-     * <p>
-     * For more information on the Content-Type header, see <a
-     * href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.17">
-     * http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.17</a>
-     * </p>
+     *
+     * For more information on the Content-Type header, see
+     * http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.17
      *
      * @param contentLanguage The HTTP Content-Language header which describes the natural language(s) of the
      *                        intended audience for the enclosed entity.
@@ -286,21 +255,16 @@ public class ObjectMetadata implements Serializable {
     }
 
     /**
-     * <p>
      * Gets the optional Content-Encoding HTTP header specifying what
      * content encodings have been applied to the object and what decoding
      * mechanisms must be applied in order to obtain the media-type referenced
      * by the Content-Type field.
-     * </p>
-     * <p>
+     *
      * For more information on how the Content-Encoding HTTP header works, see
-     * <a
-     * href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.11">
-     * http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.11</a>
-     * </p>
+     * http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.11
      *
      * @return The HTTP Content-Encoding header.
-     * Returns <code>null</code> if it hasn't been set.
+     * Returns null if it hasn't been set.
      * @see com.amazonaws.services.s3.model.ObjectMetadata#setContentType(String)
      */
     public String getContentEncoding() {
@@ -308,23 +272,15 @@ public class ObjectMetadata implements Serializable {
     }
 
     /**
-     * <p>
      * Sets the optional Content-Encoding HTTP header specifying what
      * content encodings have been applied to the object and what decoding
      * mechanisms must be applied in order to obtain the media-type referenced
      * by the Content-Type field.
-     * </p>
-     * <p>
+     *
      * For more information on how the Content-Encoding HTTP header works, see
-     * <a
-     * href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.11">
-     * http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.11</a>
-     * </p>
+     * http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.11
      *
      * @param encoding The HTTP Content-Encoding header, as defined in RFC 2616.
-     * @see <a
-     * href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.11"
-     * >http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.11</a>
      * @see com.amazonaws.services.s3.model.ObjectMetadata#getContentType()
      */
     public void setContentEncoding(String encoding) {
@@ -332,20 +288,15 @@ public class ObjectMetadata implements Serializable {
     }
 
     /**
-     * <p>
      * Gets the optional Cache-Control HTTP header which allows the user to
      * specify caching behavior along the HTTP request/reply chain.
-     * </p>
-     * <p>
+     *
      * For more information on how the Cache-Control HTTP header affects HTTP
-     * requests and responses, see <a
-     * href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.9">
-     * http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.9</a>
-     * </p>
+     * requests and responses, see
+     * http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.9
      *
      * @return The HTTP Cache-Control header as defined in RFC 2616.
-     * Returns <code>null</code>  if
-     * it hasn't been set.
+     * Returns null if it hasn't been set.
      * @see com.amazonaws.services.s3.model.ObjectMetadata#setCacheControl(String)
      */
     public String getCacheControl() {
@@ -353,16 +304,12 @@ public class ObjectMetadata implements Serializable {
     }
 
     /**
-     * <p>
      * Sets the optional Cache-Control HTTP header which allows the user to
      * specify caching behavior along the HTTP request/reply chain.
-     * </p>
-     * <p>
+     *
      * For more information on how the Cache-Control HTTP header affects HTTP
-     * requests and responses see <a
-     * href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.9">
-     * http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.9</a>
-     * </p>
+     * requests and responses see
+     * http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.9
      *
      * @param cacheControl The HTTP Cache-Control header as defined in RFC 2616.
      * @see com.amazonaws.services.s3.model.ObjectMetadata#getCacheControl()
@@ -372,23 +319,19 @@ public class ObjectMetadata implements Serializable {
     }
 
     /**
-     * <p>
      * Sets the base64 encoded 128-bit MD5 digest of the associated object
      * (content - not including headers) according to RFC 1864. This data is
      * used as a message integrity check to verify that the data received by
      * ObjectStorageClient is the same data that the caller sent. If set to null,then the
      * MD5 digest is removed from the metadata.
-     * </p>
-     * <p>
+     *
      * This field represents the base64 encoded 128-bit MD5 digest digest of an
      * object's content as calculated on the caller's side. The ETag metadata
      * field represents the hex encoded 128-bit MD5 digest as computed by Amazon
      * S3.
-     * </p>
-     * <p>
+     *
      * The ObjectStorageClient Java client will attempt to calculate this field automatically
      * when uploading files to ObjectStorageClient.
-     * </p>
      *
      * @param md5Base64 The base64 encoded MD5 hash of the content for the object
      *                  associated with this metadata.
@@ -404,25 +347,21 @@ public class ObjectMetadata implements Serializable {
     }
 
     /**
-     * <p>
      * Gets the base64 encoded 128-bit MD5 digest of the associated object
      * (content - not including headers) according to RFC 1864. This data is
      * used as a message integrity check to verify that the data received by
      * ObjectStorageClient is the same data that the caller sent.
-     * </p>
-     * <p>
+     *
      * This field represents the base64 encoded 128-bit MD5 digest digest of an
      * object's content as calculated on the caller's side. The ETag metadata
      * field represents the hex encoded 128-bit MD5 digest as computed by Amazon
      * S3.
-     * </p>
-     * <p>
+     *
      * The ObjectStorageClient Java client will attempt to calculate this field automatically
      * when uploading files to ObjectStorageClient.
-     * </p>
      *
      * @return The base64 encoded MD5 hash of the content for the associated
-     * object.  Returns <code>null</code> if the MD5 hash of the content
+     * object.  Returns null if the MD5 hash of the content
      * hasn't been set.
      * @see com.amazonaws.services.s3.model.ObjectMetadata#setContentMD5(String)
      */
@@ -431,17 +370,13 @@ public class ObjectMetadata implements Serializable {
     }
 
     /**
-     * <p>
      * Sets the optional Content-Disposition HTTP header, which specifies
      * presentational information such as the recommended filename for the
      * object to be saved as.
-     * </p>
-     * <p>
+     *
      * For more information on how the Content-Disposition header affects HTTP
-     * client behavior, see <a
-     * href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec19.html#sec19.5.1">
-     * http://www.w3.org/Protocols/rfc2616/rfc2616-sec19.html#sec19.5.1</a>
-     * </p>
+     * client behavior, see
+     * http://www.w3.org/Protocols/rfc2616/rfc2616-sec19.html#sec19.5.1
      *
      * @param disposition The value for the Content-Disposition header.
      * @see com.amazonaws.services.s3.model.ObjectMetadata#getContentDisposition()
@@ -451,24 +386,17 @@ public class ObjectMetadata implements Serializable {
     }
 
     /**
-     * <p>
      * Gets the optional Content-Disposition HTTP header, which specifies
      * presentation information for the object such as the recommended filename
      * for the object to be saved as.
-     * </p>
-     * <p>
+     *
      * For more information on how the Content-Disposition header affects HTTP
-     * client behavior, see <a
-     * href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec19.html#sec19.5.1">
-     * http://www.w3.org/Protocols/rfc2616/rfc2616-sec19.html#sec19.5.1</a>
-     * </p>
+     * client behavior, see
+     * http://www.w3.org/Protocols/rfc2616/rfc2616-sec19.html#sec19.5.1
      *
      * @return The value of the Content-Disposition header.
-     * Returns <code>null</code> if the Content-Disposition header
+     * Returns null if the Content-Disposition header
      * hasn't been set.
-     * @see <a
-     * href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec19.html#sec19.5.1"
-     * >http://www.w3.org/Protocols/rfc2616/rfc2616-sec19.html#sec19.5.1</a>
      * @see com.amazonaws.services.s3.model.ObjectMetadata#setCacheControl(String)
      */
     public String getContentDisposition() {
@@ -480,15 +408,14 @@ public class ObjectMetadata implements Serializable {
      * according to RFC 1864. This data is used as an integrity check to verify
      * that the data received by the caller is the same data that was sent by
      * ObjectStorageClient.
-     * <p>
+     *
      * This field represents the hex encoded 128-bit MD5 digest of an object's
      * content as calculated by ObjectStorageClient. The ContentMD5 field represents the
      * base64 encoded 128-bit MD5 digest as calculated on the caller's side.
-     * </p>
      *
      * @return The hex encoded MD5 hash of the content for the associated object
      * as calculated by ObjectStorageClient.
-     * Returns <code>null</code> if it hasn't been set yet.
+     * Returns null if it hasn't been set yet.
      */
     public String getETag() {
         return (String) metadata.get(Headers.ETAG);
@@ -501,13 +428,10 @@ public class ObjectMetadata implements Serializable {
 
 
     /**
-     * <p>
      * Returns the content range of the object if response contains the Content-Range header.
-     * </p>
-     * <p>
+     *
      * If the request specifies a range or part number, then response returns the Content-Range range header.
      * Otherwise, the response does not return Content-Range header.
-     * </p>
      *
      * @return Returns content range if the object is requested with specific range or part number,
      * null otherwise.

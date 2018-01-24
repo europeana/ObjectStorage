@@ -4,7 +4,7 @@
     <parent>
         <groupId>eu.europeana</groupId>
         <artifactId>europeana-parent-pom</artifactId>
-        <version>1.6</version>
+        <version>1.8-SNAPSHOT</version>
     </parent>
     <groupId>eu.europeana</groupId>
     <artifactId>object-storage</artifactId>
@@ -36,6 +36,13 @@
             <version>1.11.64</version>
         </dependency>
 
+        <!-- for Bluemix compatibility -->
+        <dependency>
+            <groupId>com.softlayer.api</groupId>
+            <artifactId>softlayer-api-client</artifactId>
+            <version>0.2.5</version>
+        </dependency>
+
         <!--Test dependencies -->
         <dependency>
             <groupId>junit</groupId>
@@ -49,6 +56,43 @@
             <scope>test</scope>
         </dependency> -->
     </dependencies>
+
+
+    <build>
+    <plugins>
+    <!-- include sources when releasing -->
+    <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-source-plugin</artifactId>
+        <executions>
+            <execution>
+                <id>attach-sources</id>
+                <goals>
+                    <goal>jar</goal>
+                </goals>
+            </execution>
+        </executions>
+    </plugin>
+
+    <!-- include javadoc when releasing -->
+    <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <executions>
+            <execution>
+                <id>attach-javadocs</id>
+                <goals>
+                    <goal>jar</goal>
+                </goals>
+                <configuration>
+                    <additionalparam>${javadoc.opts}</additionalparam>
+                </configuration>
+            </execution>
+        </executions>
+    </plugin>
+    </plugins>
+    </build>
+
     <scm>
         <developerConnection>scm:git:https://github.com/europeana/ObjectStorage.git</developerConnection>
     </scm>

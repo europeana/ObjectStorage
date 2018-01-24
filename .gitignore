@@ -14,3 +14,4 @@ hs_err_pid*
 *.iml
 target/
 /src/test/resources/objectstorage.properties
+src/main/resources/objectstorage.properties

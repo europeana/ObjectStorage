@@ -46,10 +46,12 @@ public class S3ObjectStorageClientTest {
     private static final String CLIENT_KEY = "AKIAIOSFODNN7EXAMPLE";
     private static final String SECRET_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
     private static final String REGION = Regions.EU_CENTRAL_1.getName();
+
     //private static GenericContainer s3server;
     private static int port;
     private static String host;
     private static boolean runInDocker = false; // for now set to false
+    private static boolean isBluemix = true; // for now set to true
 
     private static final String TEST_BUCKET_NAME = "unit-test";
 
@@ -79,7 +81,18 @@ public class S3ObjectStorageClientTest {
 //            client = new S3ObjectStorageClient(CLIENT_KEY, SECRET_KEY, BUCKET_NAME, "http://" + host + ":" + port + "/s3", new S3ClientOptions().withPathStyleAccess(true));
         } else {
             Properties prop = loadAndCheckLoginProperties();
-            client = new S3ObjectStorageClient(prop.getProperty("s3.key"), prop.getProperty("s3.secret"), prop.getProperty("s3.region"), prop.getProperty("s3.bucket"));
+            if (isBluemix) {
+                client = new S3ObjectStorageClient(prop.getProperty("s3.key")
+                        , prop.getProperty("s3.secret")
+                        , prop.getProperty("s3.region")
+                        , prop.getProperty("s3.bucket")
+                        , prop.getProperty("s3.endpoint"));     // bluemix test
+            } else {
+                client = new S3ObjectStorageClient(prop.getProperty("s3.key")
+                        , prop.getProperty("s3.secret")
+                        , prop.getProperty("s3.region")
+                        , prop.getProperty("s3.bucket"));
+            }
         }
     }
 
