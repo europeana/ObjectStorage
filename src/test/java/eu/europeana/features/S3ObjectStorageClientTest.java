@@ -40,20 +40,7 @@ public class S3ObjectStorageClientTest {
 
     private static final Logger LOG = LogManager.getLogger(S3ObjectStorageClientTest.class);
 
-    // docker configuration, doesn't work yet because of an issue to the Amazon Mock S3 container
-    private static final String BUCKET_NAME = "europeana-sitemap-test";
-    private static final Integer EXPOSED_PORT = 9444;
-    private static final String CLIENT_KEY = "AKIAIOSFODNN7EXAMPLE";
-    private static final String SECRET_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
-    private static final String REGION = Regions.EU_CENTRAL_1.getName();
-
-    //private static GenericContainer s3server;
-    private static int port;
-    private static String host;
-    private static boolean runInDocker = false; // for now set to false
-    private static boolean isBluemix = true; // for now set to true
-
-    private static final String TEST_BUCKET_NAME = "unit-test";
+    private static boolean runBluemixTest = true; // for now set to true
 
     private static final String TEST_OBJECT_NAME = "test-object";
     private static final String TEST_OBJECT_DATA = "This is just some text...";
@@ -72,16 +59,16 @@ public class S3ObjectStorageClientTest {
     @BeforeClass
     public static void initClientAndTestServer() throws IOException {
         //TODO fix Amazon Mock S3 Container setup
-        if (runInDocker) {
+//        if (runInDocker) {
 //            s3server = new GenericContainer("meteogroup/s3mock:latest")
 //                    .withExposedPorts(EXPOSED_PORT);
 //            s3server.start();
 //            port = s3server.getMappedPort(EXPOSED_PORT);
 //            host = s3server.getContainerIpAddress();
 //            client = new S3ObjectStorageClient(CLIENT_KEY, SECRET_KEY, BUCKET_NAME, "http://" + host + ":" + port + "/s3", new S3ClientOptions().withPathStyleAccess(true));
-        } else {
+//        } else {
             Properties prop = loadAndCheckLoginProperties();
-            if (isBluemix) {
+            if (runBluemixTest) {
                 client = new S3ObjectStorageClient(prop.getProperty("s3.key")
                         , prop.getProperty("s3.secret")
                         , prop.getProperty("s3.region")
@@ -94,7 +81,7 @@ public class S3ObjectStorageClientTest {
                         , prop.getProperty("s3.bucket"));
             }
         }
-    }
+//    }
 
     private static Properties loadAndCheckLoginProperties() throws IOException {
         Properties prop = new Properties();
@@ -112,30 +99,30 @@ public class S3ObjectStorageClientTest {
         return prop;
     }
 
-    @AfterClass
-    public static void tearDown() throws Exception {
-        if (runInDocker) {
-            //s3server.stop();
-        }
-    }
-
-    @Before
-    public void prepareTest() throws Exception {
-        if (runInDocker) {
-            Bucket bucket = client.createBucket(BUCKET_NAME);
-        }
-    }
-
-    @After
-    public void cleanUpTestData() {
-        if (runInDocker) {
-            client.deleteBucket(BUCKET_NAME);
-        }
-    }
+//    @AfterClass
+//    public static void tearDown() throws Exception {
+//        if (runInDocker) {
+//            //s3server.stop();
+//        }
+//    }
+//
+//    @Before
+//    public void prepareTest() throws Exception {
+//        if (runInDocker) {
+//            Bucket bucket = client.createBucket(BUCKET_NAME);
+//        }
+//    }
+//
+//    @After
+//    public void cleanUpTestData() {
+//        if (runInDocker) {
+//            client.deleteBucket(BUCKET_NAME);
+//        }
+//    }
 
 
     // TODO Fix test, for some reason we get a Access Denies when trying to list all buckets (or create a new bucket)
-    // This has probably to do with the way we connect to S3
+    // This has probably to do with the way we connect to Amazon S3
     //@Test
     public void testListBuckets() {
         for(Bucket bucket : client.listBuckets()) {
@@ -263,7 +250,7 @@ public class S3ObjectStorageClientTest {
 
     /**
      * Does a stress test of putting, retrieving and deleting a small test object.
-     * Note that this may take a while (approx. 4 minutes for 1000 items)
+     * Note that this may take a while (approx. 5 minutes for 1000 items)
      */
     @Test (timeout=500000)
     public void testStressUpload() throws ContentValidationException, IOException, URISyntaxException {
