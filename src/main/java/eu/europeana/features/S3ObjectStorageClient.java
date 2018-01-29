@@ -1,12 +1,8 @@
 package eu.europeana.features;
 
-import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
-import com.amazonaws.client.builder.AwsClientBuilder;
-import com.amazonaws.regions.Region;
-import com.amazonaws.regions.RegionImpl;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
@@ -50,7 +46,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     private boolean isBluemix = false;
 
     /**
-     * Create a new S3 client
+     * Create a new S3 client for Amazon S3
      * @param clientKey
      * @param secretKey
      * @param region
@@ -64,7 +60,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     }
 
     /**
-     * Create a new S3 client and specify an endpoint (bluemix). Calling this constructor sets the boolean isBlueMix
+     * Create a new S3 client for IBM Cloud/Bluemix. Calling this constructor sets the boolean isBlueMix
      * to true; it is used to switch to the correct way of constructing the Object URI when using resource path
      * addressing (used by Bluemix) instead of virtual host addressing (default usage with Amazon S3).
      * Also note that the region parameter is superfluous, but I will maintain it for now in order to be able to
@@ -77,9 +73,9 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
      */
     public S3ObjectStorageClient(String clientKey, String secretKey, String region, String bucketName, String endpoint) {
         System.setProperty("com.amazonaws.sdk.disableDNSBuckets", "True");
-        S3ClientOptions opts = new S3ClientOptions().withPathStyleAccess(true);
+        S3ClientOptions.Builder optionsBuilder = S3ClientOptions.builder().setPathStyleAccess(true);
         client = new AmazonS3Client(new BasicAWSCredentials(clientKey, secretKey));
-        client.setS3ClientOptions(opts);
+        client.setS3ClientOptions(optionsBuilder.build());
         client.setEndpoint(endpoint);
         this.bucketName = bucketName;
         isBluemix = true;
@@ -187,6 +183,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
      * @see ObjectStorageClient#put(String, Payload)
      */
     @Override
+    @SuppressWarnings("squid:S2070") // ignore SonarQube MD5 warnings because we have no choice but to use that
     public String put(String key, Payload value) {
         com.amazonaws.services.s3.model.ObjectMetadata metadata = new com.amazonaws.services.s3.model.ObjectMetadata();
         byte[] content = new byte[0];
@@ -298,8 +295,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     @Override
     public ObjectMetadata getMetaData(String id) {
         com.amazonaws.services.s3.model.ObjectMetadata s3data = client.getObjectMetadata(bucketName, id);
-        ObjectMetadata result = new ObjectMetadata(s3data.getRawMetadata());
-        return result;
+        return new ObjectMetadata(s3data.getRawMetadata());
     }
 
     /**
@@ -363,6 +359,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
      * @return read and verified content from the stream
      * @throws ContentValidationException, IOException
      */
+    @SuppressWarnings("squid:S2070") // ignore SonarQube MD5 warnings because we have no choice but to use that
     private ByteArrayPayload readAndVerifyContent(S3ObjectInputStream contentStream, byte[] serverSideHash) throws ContentValidationException, IOException {
         ByteArrayPayload result = null;
         try {
