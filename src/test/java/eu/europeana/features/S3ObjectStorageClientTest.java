@@ -40,7 +40,7 @@ public class S3ObjectStorageClientTest {
 
     private static final Logger LOG = LogManager.getLogger(S3ObjectStorageClientTest.class);
 
-    private static boolean runBluemixTest = true; // for now set to true
+    private static boolean runBluemixTest = false; // for now set to true
 
     private static final String TEST_OBJECT_NAME = "test-object";
     private static final String TEST_OBJECT_DATA = "This is just some text...";
