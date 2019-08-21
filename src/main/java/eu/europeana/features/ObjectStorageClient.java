@@ -110,7 +110,7 @@ public interface ObjectStorageClient {
     /**
      * Get the metadata of the specified object
      * @param objectName corresponds to {@link StorageObject#getName()}.
-     * @return ObjectMetadata of the requests object
+     * @return ObjectMetadata of the requests object or null if not found.
      */
     ObjectMetadata getMetaData(String objectName);
 

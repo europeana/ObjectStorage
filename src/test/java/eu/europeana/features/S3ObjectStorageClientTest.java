@@ -1,6 +1,5 @@
 package eu.europeana.features;
 
-import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.model.Bucket;
 import eu.europeana.domain.ContentValidationException;
 import eu.europeana.domain.StorageObject;
@@ -8,9 +7,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jclouds.io.Payload;
 import org.jclouds.io.payloads.ByteArrayPayload;
-import org.junit.After;
 import org.junit.AfterClass;
-import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -23,10 +20,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 /**
  * This class tests object storage and retrieval at Amazon S3.
@@ -40,7 +34,7 @@ public class S3ObjectStorageClientTest {
 
     private static final Logger LOG = LogManager.getLogger(S3ObjectStorageClientTest.class);
 
-    private static boolean runBluemixTest = false; // for now set to true
+    private static boolean runBluemixTest = true;
 
     private static final String TEST_OBJECT_NAME = "test-object";
     private static final String TEST_OBJECT_DATA = "This is just some text...";
@@ -164,7 +158,6 @@ public class S3ObjectStorageClientTest {
         start = System.nanoTime();
         eu.europeana.domain.ObjectMetadata metadata = client.getMetaData(id);
         timingMetadata += (System.nanoTime() - start);
-
         assertNotNull(metadata);
 
         // retrieve as storageobject without payload
@@ -206,6 +199,42 @@ public class S3ObjectStorageClientTest {
         // check if we can find it in list of objects, this make take quite some time
         //assertTrue(client.list().stream().map(StorageObject::getName).collect(Collectors.toList()).contains(id));
         nrItems++;
+    }
+
+    /**
+     * Test what happens if an object does not exist
+     */
+    @Test
+    public void testGetStorageObjectNotExist() throws ContentValidationException {
+        deleteOldTestObject(TEST_OBJECT_NAME);
+
+        Optional<StorageObject> optional = client.get("THIS_IS_NOT_A_VALID_OBJECT");
+        assertFalse(optional.isPresent());
+
+        Optional<StorageObject> optional2 = client.get("THIS_IS_NOT_A_VALID_OBJECT_TOO", true);
+        assertFalse(optional2.isPresent());
+
+        Optional<StorageObject> optional3 = client.getWithoutBody("THIS_IS_NOT_A_VALID_OBJECT_THREE");
+        assertFalse(optional3.isPresent());
+    }
+
+    @Test
+    public void getContentNotExists() {
+        deleteOldTestObject(TEST_OBJECT_NAME);
+
+        byte[] content = client.getContent("THIS_IS_NOT_A_VALID_OBJECT");
+        assert(content.length == 0);
+    }
+
+
+    /**
+     * Test what happens if the metadata of an object does not exist
+     */
+    @Test
+    public void testGetMetaDataNotExist() {
+        deleteOldTestObject(TEST_OBJECT_NAME);
+
+        assertNull(client.getMetaData("THIS_IS_NOT_A_VALID_ID"));
     }
 
     /**

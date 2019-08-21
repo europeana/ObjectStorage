@@ -289,13 +289,25 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         return result;
     }
 
+    private ObjectMetadata getObjectMetaData(String id) {
+        com.amazonaws.services.s3.model.ObjectMetadata s3data = client.getObjectMetadata(bucketName, id);
+        return new ObjectMetadata(s3data.getRawMetadata());
+    }
+
     /**
      * @see eu.europeana.features.ObjectStorageClient#getMetaData(String)
      */
     @Override
     public ObjectMetadata getMetaData(String id) {
-        com.amazonaws.services.s3.model.ObjectMetadata s3data = client.getObjectMetadata(bucketName, id);
-        return new ObjectMetadata(s3data.getRawMetadata());
+        try {
+            return getObjectMetaData(id);
+        } catch (AmazonS3Exception ex) {
+            if (ex.getStatusCode() == 404) {
+                return null;
+            } else {
+                throw new ObjectStorageClientException(ERROR_MSG_RETRIEVE + id, ex);
+            }
+        }
     }
 
     /**
@@ -345,7 +357,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
                 LOG.error("Error reading object content", e);
             }
         } else {
-            ObjectMetadata metadata = getMetaData(id);
+            ObjectMetadata metadata = getObjectMetaData(id);
             result = new StorageObject(id, getUri(id), metadata, null);
         }
         return result;
