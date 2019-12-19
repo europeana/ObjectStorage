@@ -1,5 +1,6 @@
 package eu.europeana.features;
 
+import com.amazonaws.SdkClientException;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
@@ -40,6 +41,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     private static final Logger LOG = LogManager.getLogger(S3ObjectStorageClient.class);
 
     private static final String ERROR_MSG_RETRIEVE = "Error retrieving storage object ";
+    private static final String ERROR_MSG_AWS_S3 = "Error with the AWS S3 client ";
 
     private AmazonS3 client;
     private String bucketName;
@@ -233,8 +235,11 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
             if (ex.getStatusCode() == 404) {
                 return Optional.empty();
             } else {
-                throw new ObjectStorageClientException(ERROR_MSG_RETRIEVE +objectName+ " without body", ex);
+                throw new ObjectStorageClientException(ERROR_MSG_RETRIEVE +objectName+ " without body" + " - " +ex.getErrorMessage(), ex);
             }
+        }catch (SdkClientException e){
+            LOG.error(ERROR_MSG_AWS_S3, e);
+            throw new ObjectStorageClientException(ERROR_MSG_AWS_S3 + "for objectName " +objectName + "  without body - " + e.getMessage());
         }
     }
 
@@ -251,8 +256,11 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
             if (ex.getStatusCode() == 404) {
                 return Optional.empty();
             } else {
-                throw new ObjectStorageClientException(ERROR_MSG_RETRIEVE +objectName, ex);
+                throw new ObjectStorageClientException(ERROR_MSG_RETRIEVE +objectName + " - " +ex.getErrorMessage(), ex);
             }
+        } catch (SdkClientException e){
+            LOG.error(ERROR_MSG_AWS_S3, e);
+            throw new ObjectStorageClientException(ERROR_MSG_AWS_S3 + "for objectName " +objectName + " - " + e.getMessage());
         }
     }
 
@@ -409,7 +417,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     /**
      * Create a new bucket with the provided name and switch to this new bucket
      * @param bucketName
-     * @return 
+     * @return
      */
     public Bucket createBucket(String bucketName) {
         Bucket result = client.createBucket(bucketName);
