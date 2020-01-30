@@ -1,6 +1,6 @@
 package eu.europeana.features;
 
-import com.amazonaws.SdkClientException;
+import com.amazonaws.AmazonServiceException;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
@@ -15,6 +15,7 @@ import eu.europeana.domain.ContentValidationException;
 import eu.europeana.domain.ObjectMetadata;
 import eu.europeana.domain.ObjectStorageClientException;
 import eu.europeana.domain.StorageObject;
+import org.apache.http.HttpStatus;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jclouds.io.Payload;
@@ -41,11 +42,10 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     private static final Logger LOG = LogManager.getLogger(S3ObjectStorageClient.class);
 
     private static final String ERROR_MSG_RETRIEVE = "Error retrieving storage object ";
-    private static final String ERROR_MSG_AWS_S3 = "Error with the AWS S3 client ";
 
     private AmazonS3 client;
     private String bucketName;
-    private boolean isBluemix = false;
+    private boolean isIbmCloud = false;
 
     /**
      * Create a new S3 client for Amazon S3
@@ -58,7 +58,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         AWSCredentials credentials = new BasicAWSCredentials(clientKey, secretKey);
         client = AmazonS3ClientBuilder.standard().withCredentials(new AWSStaticCredentialsProvider(credentials)).withRegion(region).build();
         this.bucketName = bucketName;
-        LOG.info("Connected to Amazon S3 bucket {}", bucketName);
+        LOG.info("Connected to Amazon S3 bucket {}, region", bucketName, region);
     }
 
     /**
@@ -80,8 +80,8 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         client.setS3ClientOptions(optionsBuilder.build());
         client.setEndpoint(endpoint);
         this.bucketName = bucketName;
-        isBluemix = true;
-        LOG.info("Connected to Bluemix S3 bucket {}", bucketName);
+        isIbmCloud = true;
+        LOG.info("Connected to IBM Cloud S3 bucket {}, region {}", bucketName, region);
     }
 
     /**
@@ -104,13 +104,17 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
      * @see ObjectStorageClient#getName()
      */
     @Override
-    public String getName() { return "S3"; }
+    public String getName() {
+        return (isIbmCloud ? "IBM Cloud S3" : "Amazon S3");
+    }
 
     /**
      * @see ObjectStorageClient#getBucketName()
      */
     @Override
-    public String getBucketName() { return bucketName; }
+    public String getBucketName() {
+        return bucketName;
+    }
 
     /**
      * @see ObjectStorageClient#list()
@@ -154,12 +158,12 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     }
 
     private URI getUri(String key) {
-        if (isBluemix) {
+        if (isIbmCloud) {
             return URI.create(client.getUrl(bucketName, key).toString());
         } else {
-        String bucketLocation = client.getRegionName();
-        return URI.create(bucketLocation + "/" + key);
-    }
+            String bucketLocation = client.getRegionName();
+            return URI.create(bucketLocation + "/" + key);
+        }
     }
 
     /**
@@ -228,18 +232,9 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     @Override
     public Optional<StorageObject> getWithoutBody(String objectName) {
         try {
-            return Optional.of(retrieveAsStorageObject(objectName, false, false));
-        } catch (ContentValidationException e) {
-            throw new ObjectStorageClientException(ERROR_MSG_RETRIEVE +objectName+ " without body", e);
-        } catch (AmazonS3Exception ex) {
-            if (ex.getStatusCode() == 404) {
-                return Optional.empty();
-            } else {
-                throw new ObjectStorageClientException(ERROR_MSG_RETRIEVE +objectName+ " without body" + " - " +ex.getErrorMessage(), ex);
-            }
-        }catch (SdkClientException e){
-            LOG.error(ERROR_MSG_AWS_S3, e);
-            throw new ObjectStorageClientException(ERROR_MSG_AWS_S3 + "for objectName " +objectName + "  without body - " + e.getMessage());
+            return Optional.ofNullable(retrieveAsStorageObject(objectName, false, false));
+        } catch (ContentValidationException | AmazonS3Exception e) {
+            throw new ObjectStorageClientException(ERROR_MSG_RETRIEVE + objectName + " without body", e);
         }
     }
 
@@ -249,18 +244,9 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     @Override
     public Optional<StorageObject> get(String objectName) {
         try {
-            return Optional.of(retrieveAsStorageObject(objectName, true, false));
-        } catch (ContentValidationException e) {
-            throw new ObjectStorageClientException(ERROR_MSG_RETRIEVE +objectName, e);
-        } catch (AmazonS3Exception ex) {
-            if (ex.getStatusCode() == 404) {
-                return Optional.empty();
-            } else {
-                throw new ObjectStorageClientException(ERROR_MSG_RETRIEVE +objectName + " - " +ex.getErrorMessage(), ex);
-            }
-        } catch (SdkClientException e){
-            LOG.error(ERROR_MSG_AWS_S3, e);
-            throw new ObjectStorageClientException(ERROR_MSG_AWS_S3 + "for objectName " +objectName + " - " + e.getMessage());
+            return Optional.ofNullable(retrieveAsStorageObject(objectName, true, false));
+        } catch (ContentValidationException | AmazonS3Exception e) {
+            throw new ObjectStorageClientException(ERROR_MSG_RETRIEVE + objectName, e);
         }
     }
 
@@ -270,16 +256,11 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     @Override
     public Optional<StorageObject> get(String objectName, boolean verify) throws ContentValidationException {
         try {
-            return Optional.of(retrieveAsStorageObject(objectName, true, verify));
+            return Optional.ofNullable(retrieveAsStorageObject(objectName, true, verify));
         } catch (AmazonS3Exception ex) {
-            if (ex.getStatusCode() == 404) {
-                return Optional.empty();
-            } else {
-                throw new ObjectStorageClientException(ERROR_MSG_RETRIEVE +objectName, ex);
-            }
+            throw new ObjectStorageClientException(ERROR_MSG_RETRIEVE + objectName, ex);
         }
     }
-
 
     /**
      * @see eu.europeana.features.ObjectStorageClient#getContent(String)
@@ -290,7 +271,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         try {
             result = retrieveAsBytes(objectName);
         } catch (AmazonS3Exception ex) {
-            if (ex.getStatusCode() != 404) {
+            if (!is404Exception(ex)) {
                 throw new ObjectStorageClientException(ERROR_MSG_RETRIEVE +objectName, ex);
             }
         }
@@ -310,12 +291,11 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         try {
             return getObjectMetaData(id);
         } catch (AmazonS3Exception ex) {
-            if (ex.getStatusCode() == 404) {
-                return null;
-            } else {
+            if (!is404Exception(ex)) {
                 throw new ObjectStorageClientException(ERROR_MSG_RETRIEVE + id, ex);
             }
         }
+        return null;
     }
 
     /**
@@ -343,32 +323,50 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
      * @param id
      * @param getContent, if false then only metadata is retrieved
      * @param verify if true then the MD5 hash of the content will be verified to check if it was downloaded correctly
-     * @return
+     * @return null if the object was not found (404 exception)
      */
     private StorageObject retrieveAsStorageObject(String id, boolean getContent, boolean verify) throws ContentValidationException {
         StorageObject result = null;
         if (getContent) {
             try (S3Object object = client.getObject(bucketName, id)) {
-                ObjectMetadata objectMetadata = new ObjectMetadata(object.getObjectMetadata().getRawMetadata());
-                ByteArrayPayload content;
-                try (S3ObjectInputStream contentStream = object.getObjectContent()) {
-                    if (verify) {
-                        content = readAndVerifyContent(contentStream, BinaryUtils.fromHex(objectMetadata.getETag()));
-
-                    } else {
-                        content = new ByteArrayPayload(IOUtils.toByteArray(contentStream));
-                    }
-                    content.close();
-                }
-                result = new StorageObject(object.getKey(), getUri(object.getKey()), objectMetadata, content);
+                result = getContent(object, verify);
             } catch (IOException e) {
                 LOG.error("Error reading object content", e);
+            } catch (RuntimeException e) {
+                if (!is404Exception(e)) {
+                    LOG.error("Error reading object content ", e);
+                }
             }
         } else {
-            ObjectMetadata metadata = getObjectMetaData(id);
-            result = new StorageObject(id, getUri(id), metadata, null);
+            try {
+                ObjectMetadata metadata = getObjectMetaData(id);
+                result = new StorageObject(id, getUri(id), metadata, null);
+            } catch (RuntimeException e) {
+                if (!is404Exception(e)) {
+                    LOG.error("Error reading object content ", e);
+                }
+            }
         }
         return result;
+    }
+
+    private StorageObject getContent(S3Object object, boolean verify) throws IOException, ContentValidationException {
+        ObjectMetadata objectMetadata = new ObjectMetadata(object.getObjectMetadata().getRawMetadata());
+        ByteArrayPayload content;
+        try (S3ObjectInputStream contentStream = object.getObjectContent()) {
+            if (verify) {
+                content = readAndVerifyContent(contentStream, BinaryUtils.fromHex(objectMetadata.getETag()));
+            } else {
+                content = new ByteArrayPayload(IOUtils.toByteArray(contentStream));
+            }
+            content.close();
+        }
+        return new StorageObject(object.getKey(), getUri(object.getKey()), objectMetadata, content);
+    }
+
+    private boolean is404Exception(Exception e) {
+        return (e instanceof AmazonServiceException) &&
+                (((AmazonServiceException) e).getStatusCode() == HttpStatus.SC_NOT_FOUND);
     }
 
     /**
@@ -417,7 +415,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     /**
      * Create a new bucket with the provided name and switch to this new bucket
      * @param bucketName
-     * @return
+     * @return the newly created bucket
      */
     public Bucket createBucket(String bucketName) {
         Bucket result = client.createBucket(bucketName);
@@ -443,6 +441,4 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     public void setS3ClientOptions(S3ClientOptions s3ClientOptions) {
         client.setS3ClientOptions(s3ClientOptions);
     }
-
-
 }
