@@ -34,6 +34,8 @@ public class ObjectMetadata implements Serializable {
      * All other (non user custom) headers such as Content-Length, Content-Type,
      * etc.
      */
+    @SuppressWarnings("squid:S1948") // we have to use a Map<String, Object) because that's what S3 SDK returns us
+    // we can only assume that the objects returned are always serializable
     private HashMap<String, Object> metadata;
 
     /**
