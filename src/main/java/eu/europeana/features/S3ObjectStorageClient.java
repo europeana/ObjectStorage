@@ -1,6 +1,7 @@
 package eu.europeana.features;
 
 import com.amazonaws.AmazonServiceException;
+import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
@@ -56,9 +57,15 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
      */
     public S3ObjectStorageClient(String clientKey, String secretKey, String region, String bucketName) {
         AWSCredentials credentials = new BasicAWSCredentials(clientKey, secretKey);
-        client = AmazonS3ClientBuilder.standard().withCredentials(new AWSStaticCredentialsProvider(credentials)).withRegion(region).build();
+        // setting client configuration
+        ClientConfiguration clientConfiguration = new ClientConfiguration()
+                .withValidateAfterInactivityMillis(20000);
+        client = AmazonS3ClientBuilder.standard().withCredentials(new AWSStaticCredentialsProvider(credentials))
+                .withClientConfiguration(clientConfiguration)
+                .withRegion(region)
+                .build();
         this.bucketName = bucketName;
-        LOG.info("Connected to Amazon S3 bucket {}, region", bucketName, region);
+        LOG.info("Connected to Amazon S3 bucket {}, region {} ", bucketName, region);
     }
 
     /**
