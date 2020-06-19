@@ -59,7 +59,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         AWSCredentials credentials = new BasicAWSCredentials(clientKey, secretKey);
         // setting client configuration
         ClientConfiguration clientConfiguration = new ClientConfiguration()
-               .withValidateAfterInactivityMillis(2000);
+               .withValidateAfterInactivityMillis(1000);
         client = AmazonS3ClientBuilder.standard().withCredentials(new AWSStaticCredentialsProvider(credentials))
                 .withClientConfiguration(clientConfiguration)
                 .withRegion(region)
