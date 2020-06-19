@@ -59,12 +59,13 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         AWSCredentials credentials = new BasicAWSCredentials(clientKey, secretKey);
         // setting client configuration
         ClientConfiguration clientConfiguration = new ClientConfiguration()
-                .withValidateAfterInactivityMillis(20000);
+               .withValidateAfterInactivityMillis(2000);
         client = AmazonS3ClientBuilder.standard().withCredentials(new AWSStaticCredentialsProvider(credentials))
                 .withClientConfiguration(clientConfiguration)
                 .withRegion(region)
                 .build();
         this.bucketName = bucketName;
+        System.out.println(clientConfiguration.getValidateAfterInactivityMillis());
         LOG.info("Connected to Amazon S3 bucket {}, region {} ", bucketName, region);
     }
 
