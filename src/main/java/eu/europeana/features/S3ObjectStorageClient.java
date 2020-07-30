@@ -23,6 +23,7 @@ import org.jclouds.io.Payload;
 import org.jclouds.io.payloads.ByteArrayPayload;
 
 import java.io.ByteArrayInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -55,7 +56,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         Properties prop = new Properties();
         try (InputStream inputStream = S3ObjectStorageClient.class.getClassLoader().getResourceAsStream(OBJECT_STORAGE_PROPERTY_FILE)) {
             if (inputStream == null) {
-                throw new RuntimeException("Please provide "+ OBJECT_STORAGE_PROPERTY_FILE + " file");
+                throw new FileNotFoundException("Please provide "+ OBJECT_STORAGE_PROPERTY_FILE + " file");
             }
             prop.load(inputStream);
         } catch (IOException e) {
