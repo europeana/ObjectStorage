@@ -29,10 +29,7 @@ import java.net.URI;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * Client for accessing objects stored on (Amazon or Bluemix or ...) S3 service.
@@ -42,11 +39,39 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
 
     private static final Logger LOG = LogManager.getLogger(S3ObjectStorageClient.class);
 
-    private static final String ERROR_MSG_RETRIEVE = "Error retrieving storage object ";
+    private static final String ERROR_MSG_RETRIEVE                      = "Error retrieving storage object ";
+    private static final String OBJECT_STORAGE_PROPERTY_FILE            = "objectstorage.properties";
+    private static final String VALIDATE_AFTER_INACTIVITY_PROPERTY      = "s3.validate.after.inactivity";
+    private static final int    VALIDATE_AFTER_INACTIVITY_DEFAULT_VALUE = 2000;
 
     private AmazonS3 client;
     private String bucketName;
     private boolean isIbmCloud = false;
+
+    /**
+     *  loads the property file OBJECT_STORAGE_PROPERTY_FILE
+     */
+    private static Properties getPropValues() {
+        Properties prop = new Properties();
+        try (InputStream inputStream = S3ObjectStorageClient.class.getClassLoader().getResourceAsStream(OBJECT_STORAGE_PROPERTY_FILE)) {
+            if (inputStream == null) {
+                throw new RuntimeException("Please provide "+ OBJECT_STORAGE_PROPERTY_FILE + " file");
+            }
+            prop.load(inputStream);
+        } catch (IOException e) {
+           LOG.error("Error reading the property file {} ", OBJECT_STORAGE_PROPERTY_FILE, e);
+        }
+        return prop;
+    }
+
+    /**
+     * Gets the value of s3.validate.after.inactivity from OBJECT_STORAGE_PROPERTY_FILE
+     * @return value present or default value 2000 ms
+     */
+    private static int getValidateAfterInactivity() {
+        String validateAfterInactivity = getPropValues().getProperty(VALIDATE_AFTER_INACTIVITY_PROPERTY);
+        return validateAfterInactivity != null ? Integer.parseInt(validateAfterInactivity) : VALIDATE_AFTER_INACTIVITY_DEFAULT_VALUE;
+    }
 
     /**
      * Create a new S3 client for Amazon S3
@@ -59,7 +84,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         AWSCredentials credentials = new BasicAWSCredentials(clientKey, secretKey);
         // setting client configuration
         ClientConfiguration clientConfiguration = new ClientConfiguration()
-               .withValidateAfterInactivityMillis(2000);
+               .withValidateAfterInactivityMillis(getValidateAfterInactivity());
         client = AmazonS3ClientBuilder.standard().withCredentials(new AWSStaticCredentialsProvider(credentials))
                 .withClientConfiguration(clientConfiguration)
                 .withRegion(region)
