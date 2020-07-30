@@ -91,7 +91,8 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
                 .withRegion(region)
                 .build();
         this.bucketName = bucketName;
-        LOG.info("Connected to Amazon S3 bucket {}, region {} ", bucketName, region);
+        LOG.info("Connected to Amazon S3 bucket {}, region {}, validateAfterInactivity {} ms ", bucketName, region,
+                clientConfiguration.getValidateAfterInactivityMillis());
     }
 
     /**
