@@ -42,7 +42,7 @@ public interface ObjectStorageClient {
     String getBucketName();
 
     /**
-     * @return an {@link List<StorageObject>}.
+     * @return a list of {@link StorageObject}.
      */
     List<StorageObject> list();
 

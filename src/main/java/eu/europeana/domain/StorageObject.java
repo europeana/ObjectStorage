@@ -109,7 +109,7 @@ public class StorageObject implements Comparable<StorageObject> {
      * Note that when you create a new object the uri and Etag may not be set yet (but will be set
      * when the object is retrieved)
      * @param object
-     * @return
+     * @return boolean, true if objects are equal, otherwise false
      */
     @Override
     public boolean equals(Object object) {
