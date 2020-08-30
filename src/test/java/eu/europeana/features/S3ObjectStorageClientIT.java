@@ -23,16 +23,16 @@ import java.util.Properties;
 import static org.junit.Assert.*;
 
 /**
- * This class tests object storage and retrieval at Amazon S3.
- * For this test to work properly you need to place an objectstorage.properties in the src/main/test/resources folder
+ * Integration test for testing (the speed of connections to) Amazon S3 and IBM S3 storage
+ * For this test to work properly you need to place an objectstorage.IT.properties in the src/main/test/resources folder
  * This file needs to contain the following keys that point to an existing bucket at S3 (s3.key, s3.secret, s3.region, s3.bucket).
  *
  * Created by Jeroen Jeurissen on 18-12-16
  * Updated by Patrick Ehlert on Feb 8th, 2017
  */
-public class S3ObjectStorageClientTest {
+public class S3ObjectStorageClientIT {
 
-    private static final Logger LOG = LogManager.getLogger(S3ObjectStorageClientTest.class);
+    private static final Logger LOG = LogManager.getLogger(S3ObjectStorageClientIT.class);
 
     private static boolean runBluemixTest = true;
 
@@ -52,36 +52,26 @@ public class S3ObjectStorageClientTest {
 
     @BeforeClass
     public static void initClientAndTestServer() throws IOException {
-        //TODO fix Amazon Mock S3 Container setup
-//        if (runInDocker) {
-//            s3server = new GenericContainer("meteogroup/s3mock:latest")
-//                    .withExposedPorts(EXPOSED_PORT);
-//            s3server.start();
-//            port = s3server.getMappedPort(EXPOSED_PORT);
-//            host = s3server.getContainerIpAddress();
-//            client = new S3ObjectStorageClient(CLIENT_KEY, SECRET_KEY, BUCKET_NAME, "http://" + host + ":" + port + "/s3", new S3ClientOptions().withPathStyleAccess(true));
-//        } else {
-            Properties prop = loadAndCheckLoginProperties();
-            if (runBluemixTest) {
-                client = new S3ObjectStorageClient(prop.getProperty("s3.key")
-                        , prop.getProperty("s3.secret")
-                        , prop.getProperty("s3.region")
-                        , prop.getProperty("s3.bucket")
-                        , prop.getProperty("s3.endpoint"));     // bluemix test
-            } else {
-                client = new S3ObjectStorageClient(prop.getProperty("s3.key")
-                        , prop.getProperty("s3.secret")
-                        , prop.getProperty("s3.region")
-                        , prop.getProperty("s3.bucket"));
-            }
+        Properties prop = loadAndCheckLoginProperties();
+        if (runBluemixTest) {
+            client = new S3ObjectStorageClient(prop.getProperty("s3.key")
+                    , prop.getProperty("s3.secret")
+                    , prop.getProperty("s3.region")
+                    , prop.getProperty("s3.bucket")
+                    , prop.getProperty("s3.endpoint"));     // bluemix test
+        } else {
+            client = new S3ObjectStorageClient(prop.getProperty("s3.key")
+                    , prop.getProperty("s3.secret")
+                    , prop.getProperty("s3.region")
+                    , prop.getProperty("s3.bucket"));
         }
-//    }
+    }
 
     private static Properties loadAndCheckLoginProperties() throws IOException {
         Properties prop = new Properties();
-        try (InputStream in = Thread.currentThread().getContextClassLoader().getResourceAsStream("objectstorage.properties")) {
+        try (InputStream in = Thread.currentThread().getContextClassLoader().getResourceAsStream("objectstorage.IT.properties")) {
             if (in == null) {
-                throw new RuntimeException("Please provide objectstorage.properties file with login details");
+                throw new RuntimeException("Please provide objectstorage.IT.properties file with login details");
             }
             prop.load(in);
             // check if the properties contain login details for test and not production
@@ -92,28 +82,6 @@ public class S3ObjectStorageClientTest {
         }
         return prop;
     }
-
-//    @AfterClass
-//    public static void tearDown() throws Exception {
-//        if (runInDocker) {
-//            //s3server.stop();
-//        }
-//    }
-//
-//    @Before
-//    public void prepareTest() throws Exception {
-//        if (runInDocker) {
-//            Bucket bucket = client.createBucket(BUCKET_NAME);
-//        }
-//    }
-//
-//    @After
-//    public void cleanUpTestData() {
-//        if (runInDocker) {
-//            client.deleteBucket(BUCKET_NAME);
-//        }
-//    }
-
 
     // TODO Fix test, for some reason we get a Access Denies when trying to list all buckets (or create a new bucket)
     // This has probably to do with the way we connect to Amazon S3
@@ -333,10 +301,11 @@ public class S3ObjectStorageClientTest {
         StorageObject original = new StorageObject(TEST_OBJECT_NAME, null, null, payload);
         client.put(original);
 
+        assertTrue(client.get(TEST_OBJECT_NAME).isPresent());
         StorageObject retrieved1 = client.get(TEST_OBJECT_NAME).get();
-        assertFalse(original.equals(retrieved1));
+        assertNotEquals(original, retrieved1);
         StorageObject retrieved2 = client.get(TEST_OBJECT_NAME).get();
-        assertTrue(retrieved1.equals(retrieved2));
+        assertEquals(retrieved1, retrieved2);
 
         // delete the object
         client.delete(TEST_OBJECT_NAME);
@@ -379,6 +348,7 @@ public class S3ObjectStorageClientTest {
 
     public void downloadAndPrintSitemapFile() throws IOException {
         Optional<StorageObject> storageObject = client.get("europeana-sitemap-hashed-blue.xml?from=179999&to=224999");
+        assertTrue(storageObject.isPresent());
         String rawContent = new String(getRawContent(storageObject.get()));
         System.out.println(rawContent);
     }
