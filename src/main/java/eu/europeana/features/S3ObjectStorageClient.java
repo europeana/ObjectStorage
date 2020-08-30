@@ -75,7 +75,10 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     }
 
     /**
-     * Create a new S3 client for Amazon S3
+     * Create a new S3 client for Amazon S3 with client configuration
+     * To resolve the stale http connection issue, which gave us "The target server failed to respond" error,
+     * we have added validateAfterInactivity in the Amazon S3 configuration (See EA-1891)
+     * Default value of validateAfterInactivity is 2000 ms
      * @param clientKey
      * @param secretKey
      * @param region
