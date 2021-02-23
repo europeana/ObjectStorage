@@ -54,7 +54,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
      */
     private static Properties loadProperties(String fileName, boolean required) {
         Properties prop = new Properties();
-        try (InputStream inputStream = S3ObjectStorageClient.class.getClassLoader().getResourceAsStream(fileName)) {
+        try (InputStream inputStream = Thread.currentThread().getContextClassLoader().getResourceAsStream(fileName)) {
             if (inputStream == null) {
                 if (required) {
                     throw new FileNotFoundException("Please provide " + fileName + " file");
