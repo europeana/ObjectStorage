@@ -23,7 +23,9 @@ import java.util.Optional;
 
 /**
  * Created by jeroen on 14-12-16.
+ * @deprecated
  */
+@Deprecated(since="2017")
 public class SwiftObjectStorageClient implements ObjectStorageClient {
 
     private static final Logger LOG = LogManager.getLogger(SwiftObjectStorageClient.class);

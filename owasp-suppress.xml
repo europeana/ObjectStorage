@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+    <suppress>
+        <notes><![CDATA[
+      file name: openstack-swift-2.4.0.jar
+      ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.apache\.jclouds\.api/openstack\-swift@.*$</packageUrl>
+        <cve>CVE-2016-0738</cve>
+    </suppress>
+    <suppress>
+        <notes><![CDATA[
+   file name: openstack-swift-2.4.0.jar
+   ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.apache\.jclouds\.api/openstack\-swift@.*$</packageUrl>
+        <cve>CVE-2017-16613</cve>
+    </suppress>
+    <suppress>
+        <notes><![CDATA[
+   file name: openstack-keystone-2.4.0.jar
+   ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.apache\.jclouds\.api/openstack\-keystone@.*$</packageUrl>
+        <cve>CVE-2020-12689</cve>
+    </suppress>
+    <suppress>
+        <notes><![CDATA[
+   file name: openstack-keystone-2.4.0.jar
+   ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.apache\.jclouds\.api/openstack\-keystone@.*$</packageUrl>
+        <cve>CVE-2020-12690</cve>
+    </suppress>
+    <suppress>
+        <notes><![CDATA[
+   file name: openstack-keystone-2.4.0.jar
+   ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.apache\.jclouds\.api/openstack\-keystone@.*$</packageUrl>
+        <cve>CVE-2020-12691</cve>
+    </suppress>
+</suppressions>
