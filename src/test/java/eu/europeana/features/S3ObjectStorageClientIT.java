@@ -247,7 +247,7 @@ public class S3ObjectStorageClientIT {
 
     /**
      * Does a stress test of putting, retrieving and deleting a small test object.
-     * Note that this may take a while (approx. 5 minutes for 1000 items)
+     * Note that this may take a while (approx. 5 minutes for 1000 items, or 33 sec for 100 items)
      */
     @Test (timeout=500000)
     public void testStressUpload() throws ContentValidationException, IOException, URISyntaxException {

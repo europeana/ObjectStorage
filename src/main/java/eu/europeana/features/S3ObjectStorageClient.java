@@ -5,6 +5,7 @@ import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
+import com.amazonaws.client.builder.AwsClientBuilder;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
@@ -40,7 +41,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
 
     private static final Logger LOG = LogManager.getLogger(S3ObjectStorageClient.class);
 
-    private static final String ERROR_MSG_RETRIEVE                      = "Error retrieving storage object ";
+    private static final String ERROR_MSG_RETRIEVE                      = "Error retrieving storage object {}";
     private static final String OBJECT_STORAGE_PROPERTY_FILE            = "objectstorage.properties";
     private static final String VALIDATE_AFTER_INACTIVITY_PROPERTY      = "s3.validate.after.inactivity";
     private static final int    VALIDATE_AFTER_INACTIVITY_DEFAULT_VALUE = 2000;
@@ -48,6 +49,79 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     private AmazonS3 client;
     private String bucketName;
     private boolean isIbmCloud = false;
+
+    /**
+     * Create a new S3 client for Amazon S3 with client configuration
+     * To resolve the stale http connection issue, which gave us "The target server failed to respond" error,
+     * we have added validateAfterInactivity in the Amazon S3 configuration (See EA-1891)
+     * Default value of validateAfterInactivity is 2000 ms
+     * @param clientKey
+     * @param secretKey
+     * @param region
+     * @param bucketName
+     */
+    public S3ObjectStorageClient(String clientKey, String secretKey, String region, String bucketName) {
+        Properties props = loadProperties(OBJECT_STORAGE_PROPERTY_FILE, true);
+
+        AWSCredentials credentials = new BasicAWSCredentials(clientKey, secretKey);
+        // setting client configuration
+        ClientConfiguration clientConfiguration = new ClientConfiguration()
+               .withValidateAfterInactivityMillis(getValidateAfterInactivity(props));
+        client = AmazonS3ClientBuilder.standard()
+                .withCredentials(new AWSStaticCredentialsProvider(credentials))
+                .withRegion(region)
+                .withClientConfiguration(clientConfiguration)
+                .build();
+        this.bucketName = bucketName;
+        LOG.info("Connected to Amazon S3 bucket {}, region {}, validateAfterInactivity {} ms ", bucketName, region,
+                clientConfiguration.getValidateAfterInactivityMillis());
+    }
+
+    /**
+     * Create a new S3 client for IBM Cloud/Bluemix. Calling this constructor sets the boolean isBlueMix
+     * to true; it is used to switch to the correct way of constructing the Object URI when using resource path
+     * addressing (used by Bluemix) instead of virtual host addressing (default usage with Amazon S3).
+     * Also note that the region parameter is superfluous, but I will maintain it for now in order to be able to
+     * overload the constructor (using 5 Strings, hence different from the other two)
+     * @param clientKey
+     * @param secretKey
+     * @param region
+     * @param bucketName
+     * @param endpoint
+     */
+    public S3ObjectStorageClient(String clientKey, String secretKey, String region, String bucketName, String endpoint) {
+        System.setProperty("com.amazonaws.sdk.disableDNSBuckets", "True");
+
+        BasicAWSCredentials creds = new BasicAWSCredentials(clientKey, secretKey);
+        client = AmazonS3ClientBuilder.standard()
+                .withCredentials(new AWSStaticCredentialsProvider(creds))
+                .withPathStyleAccessEnabled(true)
+                .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(endpoint, region))
+                .build();
+        this.bucketName = bucketName;
+        isIbmCloud = true;
+        LOG.info("Connected to IBM Cloud S3 bucket {}, region {}", bucketName, region);
+    }
+
+    /**
+     * Create a new S3 client and specify an endpoint and options
+     * @param clientKey
+     * @param secretKey
+     * @param bucketName
+     * @param endpoint
+     * @param s3ClientOptions
+     */
+    public S3ObjectStorageClient(String clientKey, String secretKey, String bucketName, String endpoint, ClientConfiguration s3ClientOptions) {
+        BasicAWSCredentials creds = new BasicAWSCredentials(clientKey, secretKey);
+        client = AmazonS3ClientBuilder.standard()
+                .withCredentials(new AWSStaticCredentialsProvider(creds))
+                .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(endpoint, null))
+                .withClientConfiguration(s3ClientOptions)
+                .build();
+        this.bucketName = bucketName;
+        isIbmCloud = false;
+        LOG.info("Connected to S3 bucket {}", bucketName);
+    }
 
     /**
      *  Loads a property file
@@ -76,71 +150,6 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     private static int getValidateAfterInactivity(Properties props) {
         String value = props.getProperty(VALIDATE_AFTER_INACTIVITY_PROPERTY);
         return (value != null ? Integer.parseInt(value) : VALIDATE_AFTER_INACTIVITY_DEFAULT_VALUE);
-    }
-
-    /**
-     * Create a new S3 client for Amazon S3 with client configuration
-     * To resolve the stale http connection issue, which gave us "The target server failed to respond" error,
-     * we have added validateAfterInactivity in the Amazon S3 configuration (See EA-1891)
-     * Default value of validateAfterInactivity is 2000 ms
-     * @param clientKey
-     * @param secretKey
-     * @param region
-     * @param bucketName
-     */
-    public S3ObjectStorageClient(String clientKey, String secretKey, String region, String bucketName) {
-        Properties props = loadProperties(OBJECT_STORAGE_PROPERTY_FILE, true);
-
-        AWSCredentials credentials = new BasicAWSCredentials(clientKey, secretKey);
-        // setting client configuration
-        ClientConfiguration clientConfiguration = new ClientConfiguration()
-               .withValidateAfterInactivityMillis(getValidateAfterInactivity(props));
-        client = AmazonS3ClientBuilder.standard().withCredentials(new AWSStaticCredentialsProvider(credentials))
-                .withClientConfiguration(clientConfiguration)
-                .withRegion(region)
-                .build();
-        this.bucketName = bucketName;
-        LOG.info("Connected to Amazon S3 bucket {}, region {}, validateAfterInactivity {} ms ", bucketName, region,
-                clientConfiguration.getValidateAfterInactivityMillis());
-    }
-
-    /**
-     * Create a new S3 client for IBM Cloud/Bluemix. Calling this constructor sets the boolean isBlueMix
-     * to true; it is used to switch to the correct way of constructing the Object URI when using resource path
-     * addressing (used by Bluemix) instead of virtual host addressing (default usage with Amazon S3).
-     * Also note that the region parameter is superfluous, but I will maintain it for now in order to be able to
-     * overload the constructor (using 5 Strings, hence different from the other two)
-     * @param clientKey
-     * @param secretKey
-     * @param region
-     * @param bucketName
-     * @param endpoint
-     */
-    public S3ObjectStorageClient(String clientKey, String secretKey, String region, String bucketName, String endpoint) {
-        System.setProperty("com.amazonaws.sdk.disableDNSBuckets", "True");
-        S3ClientOptions.Builder optionsBuilder = S3ClientOptions.builder().setPathStyleAccess(true);
-        client = new AmazonS3Client(new BasicAWSCredentials(clientKey, secretKey));
-        client.setS3ClientOptions(optionsBuilder.build());
-        client.setEndpoint(endpoint);
-        this.bucketName = bucketName;
-        isIbmCloud = true;
-        LOG.info("Connected to IBM Cloud S3 bucket {}, region {}", bucketName, region);
-    }
-
-    /**
-     * Create a new S3 client and specify an endpoint and options
-     * @param clientKey
-     * @param secretKey
-     * @param bucketName
-     * @param endpoint
-     * @param s3ClientOptions
-     */
-    public S3ObjectStorageClient(String clientKey, String secretKey, String bucketName, String endpoint, S3ClientOptions s3ClientOptions) {
-        client = new AmazonS3Client(new BasicAWSCredentials(clientKey, secretKey));
-        client.setS3ClientOptions(s3ClientOptions);
-        client.setEndpoint(endpoint);
-        this.bucketName = bucketName;
-        LOG.info("Connected to S3 bucket {}", bucketName);
     }
 
     /**
@@ -223,7 +232,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         try (InputStream inputStream = storageObject.getPayload().openStream()) {
             putObjectResult = client.putObject(new PutObjectRequest(bucketName, storageObject.getName(), inputStream, checkMetaData(metadata)));
         } catch (IOException e) {
-            LOG.error("Error storing object "+storageObject.getName(), e);
+            LOG.error("Error storing object {}", storageObject.getName(), e);
         }
         return (putObjectResult == null ? null : putObjectResult.getETag());
     }
@@ -246,7 +255,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         } catch (NoSuchAlgorithmException e) {
             LOG.error("Cannot calculate MD5 hash of because no MD5 algorithm was found",e );
         } catch (IOException e) {
-            LOG.error("Error reading payload for key "+key, e);
+            LOG.error("Error reading payload for key {}", key, e);
         }
         Integer intLength = Integer.valueOf(content.length);
         metadata.setContentLength(intLength.longValue());
@@ -256,7 +265,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         try (InputStream is = new ByteArrayInputStream(content) ){
             putObjectResult = client.putObject(new PutObjectRequest(bucketName, key, is, checkMetaData(metadata)));
         } catch (IOException e) {
-            LOG.error("Error storing object with key "+key, e);
+            LOG.error("Error storing object with key {}", key, e);
         }
 
         return (putObjectResult == null ? null : putObjectResult.getETag());
@@ -450,7 +459,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         try (S3Object object = client.getObject(bucketName, id)) {
             return IOUtils.toByteArray(object.getObjectContent());
         } catch (IOException e) {
-            LOG.error(ERROR_MSG_RETRIEVE +id, e);
+            LOG.error(ERROR_MSG_RETRIEVE, id, e);
         }
         return new byte[0];
     }

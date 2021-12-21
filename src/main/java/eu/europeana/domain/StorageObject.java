@@ -17,7 +17,7 @@
 package eu.europeana.domain;
 
 import com.google.common.base.Objects;
-import com.google.common.base.Objects.ToStringHelper;
+import com.google.common.base.MoreObjects.ToStringHelper;
 import eu.europeana.features.ObjectStorageClient;
 import org.jclouds.io.Payload;
 
@@ -25,7 +25,7 @@ import java.net.URI;
 import java.util.Date;
 
 import static com.google.common.base.Objects.equal;
-import static com.google.common.base.Objects.toStringHelper;
+import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
@@ -45,9 +45,9 @@ public class StorageObject implements Comparable<StorageObject> {
     /**
      * Create a new storage object. If no metadata is provided a basic one will be generated
      * @param name required field
-     * @param uri
-     * @param metadata
-     * @param payload
+     * @param uri required, uri of the stored object
+     * @param metadata optional, metadata of the stored object
+     * @param payload optional, payload of the stored object
      */
     public StorageObject(String name, URI uri, ObjectMetadata metadata, Payload payload) {
         this.name = checkNotNull(name, "name");

@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>eu.europeana</groupId>
         <artifactId>europeana-parent-pom</artifactId>
-        <version>2.0</version>
+        <version>2.3</version>
     </parent>
 
     <groupId>eu.europeana</groupId>
@@ -16,82 +17,71 @@
     </scm>
 
     <dependencies>
-        <!-- logging -->
+        <!-- https://mvnrepository.com/artifact/org.apache.logging.log4j/log4j-core -->
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-core</artifactId>
-            <version>2.13.2</version>
+            <version>2.17.0</version>
         </dependency>
 
-        <!-- Swift -->
+        <!-- Swift https://mvnrepository.com/artifact/org.apache.jclouds/jclouds-core -->
         <dependency>
             <groupId>org.apache.jclouds</groupId>
             <artifactId>jclouds-core</artifactId>
-            <version>2.0.0</version>
+            <version>2.4.0</version>
         </dependency>
+        <!-- Swift https://mvnrepository.com/artifact/org.apache.jclouds.api/openstack-swift -->
         <dependency>
             <groupId>org.apache.jclouds.api</groupId>
             <artifactId>openstack-swift</artifactId>
-            <version>1.9.0</version>
+            <version>2.4.0</version>
         </dependency>
 
         <!-- Amazon S3 https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk -->
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk</artifactId>
-            <version>1.11.705</version>
+            <version>1.12.129</version>
         </dependency>
 
-        <!-- for Bluemix compatibility -->
+        <!-- IBM Cloud S3 https://mvnrepository.com/artifact/com.softlayer.api/softlayer-api-client -->
         <dependency>
             <groupId>com.softlayer.api</groupId>
             <artifactId>softlayer-api-client</artifactId>
-            <version>0.2.5</version>
+            <version>0.3.4</version>
         </dependency>
 
-        <!--Test dependencies -->
+        <!--JUnit https://mvnrepository.com/artifact/junit/junit -->
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
-            <version>4.13.1</version>
+            <version>4.13.2</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
 
 
     <build>
-    <plugins>
-    <!-- include sources when releasing -->
-    <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-source-plugin</artifactId>
-        <executions>
-            <execution>
-                <id>attach-sources</id>
-                <goals>
-                    <goal>jar</goal>
-                </goals>
-            </execution>
-        </executions>
-    </plugin>
-
-    <!-- include javadoc when releasing -->
-    <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-javadoc-plugin</artifactId>
-        <executions>
-            <execution>
-                <id>attach-javadocs</id>
-                <goals>
-                    <goal>jar</goal>
-                </goals>
+        <plugins>
+            <plugin>
+                <!-- This will be active when running the verify or install goal
+                     To skip (e.g. during debugging) use 'mvn clean package')-->
+                <groupId>org.owasp</groupId>
+                <artifactId>dependency-check-maven</artifactId>
+                <version>6.5.0</version>
                 <configuration>
-                    <additionalparam>${javadoc.opts}</additionalparam>
+                    <failBuildOnCVSS>7</failBuildOnCVSS>
                 </configuration>
-            </execution>
-        </executions>
-    </plugin>
-    </plugins>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+        </plugins>
     </build>
 
 
