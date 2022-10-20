@@ -20,8 +20,8 @@ import eu.europeana.domain.StorageObject;
 import org.apache.http.HttpStatus;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.jclouds.io.Payload;
-import org.jclouds.io.payloads.ByteArrayPayload;
+//import org.jclouds.io.Payload;
+//import org.jclouds.io.payloads.ByteArrayPayload;
 
 import java.io.ByteArrayInputStream;
 import java.io.FileNotFoundException;
@@ -37,7 +37,7 @@ import java.util.*;
  * Client for accessing objects stored on (Amazon or Bluemix or ...) S3 service.
  * Created by jeroen on 14-12-16; adapted to IBM Bluemix S3 by Luthien, Jan 18
  */
-public class S3ObjectStorageClient implements ObjectStorageClient {
+public class S3ObjectStorageClient {
 
     private static final Logger LOG = LogManager.getLogger(S3ObjectStorageClient.class);
 
@@ -155,43 +155,41 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     /**
      * @see ObjectStorageClient#getName()
      */
-    @Override
-    public String getName() {
+      public String getName() {
         return (isIbmCloud ? "IBM Cloud S3" : "Amazon S3");
     }
 
     /**
      * @see ObjectStorageClient#getBucketName()
      */
-    @Override
-    public String getBucketName() {
+     public String getBucketName() {
         return bucketName;
     }
 
     /**
      * @see ObjectStorageClient#list()
      */
-    @Override
-    public List<StorageObject> list() {
-        ObjectListing objectListing = client.listObjects(bucketName);
-        List<S3ObjectSummary> results = objectListing.getObjectSummaries();
-        ArrayList<StorageObject> storageObjects = new ArrayList<>();
-        for (S3ObjectSummary so : results) {
-            storageObjects.add(toStorageObject(so));
-        }
-        while (objectListing.isTruncated()) {
-            objectListing = client.listNextBatchOfObjects(objectListing);
-            for (S3ObjectSummary so : objectListing.getObjectSummaries()) {
-                storageObjects.add(toStorageObject(so));
-            }
-        }
-        return storageObjects;
-    }
+//    public List<S3Object> list() {
+//        ObjectListing objectListing = client.listObjects(bucketName);
+//        List<S3ObjectSummary> results = objectListing.getObjectSummaries();
+//        List<S3Object> s3Objects = objectListing.
+//
+//        ArrayList<StorageObject> storageObjects = new ArrayList<>();
+//        for (S3ObjectSummary so : results) {
+//            storageObjects.add(toStorageObject(so));
+//        }
+//        while (objectListing.isTruncated()) {
+//            objectListing = client.listNextBatchOfObjects(objectListing);
+//            for (S3ObjectSummary so : objectListing.getObjectSummaries()) {
+//                storageObjects.add(toStorageObject(so));
+//            }
+//        }
+//        return storageObjects;
+//    }
 
     /**
      * @see ObjectStorageClient#isAvailable(String)
      */
-    @Override
     public boolean isAvailable(String id) {
         return client.doesObjectExist(bucketName, id);
     }
@@ -200,14 +198,14 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         client.setEndpoint(endpoint);
     }
 
-    private StorageObject toStorageObject(S3ObjectSummary so) {
-        URI uri = getUri(so.getKey());
-        ObjectMetadata metadata = new ObjectMetadata();
-        metadata.setLastModified(so.getLastModified());
-        metadata.setETag(so.getETag());
-        metadata.setContentLength(so.getSize());
-        return new StorageObject(so.getKey(), uri, metadata, null);
-    }
+//    private StorageObject toStorageObject(S3ObjectSummary so) {
+//        URI uri = getUri(so.getKey());
+//        ObjectMetadata metadata = new ObjectMetadata();
+//        metadata.setLastModified(so.getLastModified());
+//        metadata.setETag(so.getETag());
+//        metadata.setContentLength(so.getSize());
+//        return new StorageObject(so.getKey(), uri, metadata, null);
+//    }
 
     private URI getUri(String key) {
         if (isIbmCloud) {
@@ -221,9 +219,8 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     /**
      * @see ObjectStorageClient#put(StorageObject)
      */
-    @Override
-    public String put(StorageObject storageObject) {
-        com.amazonaws.services.s3.model.ObjectMetadata metadata = new com.amazonaws.services.s3.model.ObjectMetadata();
+    public String put(S3Object s3Object) {
+        com.amazonaws.services.s3.model.ObjectMetadata metadata = s3Object.getObjectMetadata();
         metadata.setContentType(storageObject.getMetadata().getContentType());
         metadata.setContentLength(storageObject.getMetadata().getContentLength());
         metadata.setContentMD5(storageObject.getMetadata().getContentMD5());
@@ -238,25 +235,24 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     }
 
     /**
-     * @see ObjectStorageClient#put(String, Payload)
+     * @see ObjectStorageClient#put(String, S3Object)
      */
-    @Override
     @SuppressWarnings("squid:S2070") // ignore SonarQube MD5 warnings because we have no choice but to use that
-    public String put(String key, Payload value) {
-        com.amazonaws.services.s3.model.ObjectMetadata metadata = new com.amazonaws.services.s3.model.ObjectMetadata();
+    public String put(String key, S3Object s3Object) {
+        com.amazonaws.services.s3.model.ObjectMetadata metadata = s3Object.getObjectMetadata();
         byte[] content = new byte[0];
 
-        try {
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            try (DigestInputStream dis = new DigestInputStream(value.openStream(), md)) {
-                content = IOUtils.toByteArray(dis);
-                metadata.setContentMD5(BinaryUtils.toBase64(md.digest()));
-            }
-        } catch (NoSuchAlgorithmException e) {
-            LOG.error("Cannot calculate MD5 hash of because no MD5 algorithm was found",e );
-        } catch (IOException e) {
-            LOG.error("Error reading payload for key {}", key, e);
-        }
+//        try {
+//            MessageDigest md = MessageDigest.getInstance("MD5");
+//            try (DigestInputStream dis = new DigestInputStream(value.openStream(), md)) {
+//                content = IOUtils.toByteArray(dis);
+//                metadata.setContentMD5(BinaryUtils.toBase64(md.digest()));
+//            }
+//        } catch (NoSuchAlgorithmException e) {
+//            LOG.error("Cannot calculate MD5 hash of because no MD5 algorithm was found",e );
+//        } catch (IOException e) {
+//            LOG.error("Error reading payload for key {}", key, e);
+//        }
         Integer intLength = Integer.valueOf(content.length);
         metadata.setContentLength(intLength.longValue());
 
@@ -281,7 +277,6 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     /**
      * @see ObjectStorageClient#getWithoutBody(String)
      */
-    @Override
     public Optional<StorageObject> getWithoutBody(String objectName) {
         try {
             return Optional.ofNullable(retrieveAsStorageObject(objectName, false, false));
@@ -293,7 +288,6 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     /**
      * @see eu.europeana.features.ObjectStorageClient#get(String)
      */
-    @Override
     public Optional<StorageObject> get(String objectName) {
         try {
             return Optional.ofNullable(retrieveAsStorageObject(objectName, true, false));
@@ -305,7 +299,6 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     /**
      * @see eu.europeana.features.ObjectStorageClient#get(String, boolean)
      */
-    @Override
     public Optional<StorageObject> get(String objectName, boolean verify) throws ContentValidationException {
         try {
             return Optional.ofNullable(retrieveAsStorageObject(objectName, true, verify));
@@ -317,7 +310,6 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     /**
      * @see eu.europeana.features.ObjectStorageClient#getContent(String)
      */
-    @Override
     public byte[] getContent(String objectName) {
         byte[] result = new byte[0];
         try {
@@ -338,7 +330,6 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     /**
      * @see eu.europeana.features.ObjectStorageClient#getMetaData(String)
      */
-    @Override
     public ObjectMetadata getMetaData(String id) {
         try {
             return getObjectMetaData(id);
@@ -353,7 +344,6 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     /**
      * @see ObjectStorageClient#delete(String)
      */
-    @Override
     public void delete(String objectName) {
         DeleteObjectRequest deleteObjectRequest = new DeleteObjectRequest(bucketName, objectName);
         client.deleteObject(deleteObjectRequest);
@@ -362,7 +352,6 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     /**
      * @see ObjectStorageClient#close()
      */
-    @Override
     public void close() {
         LOG.info("Shutting down connections to {} ...", this.getName());
         ((AmazonS3Client) client).shutdown();

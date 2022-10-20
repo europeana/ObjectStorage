@@ -17,10 +17,11 @@
 package eu.europeana.features;
 
 
+import com.amazonaws.services.s3.model.S3Object;
 import eu.europeana.domain.ContentValidationException;
 import eu.europeana.domain.ObjectMetadata;
 import eu.europeana.domain.StorageObject;
-import org.jclouds.io.Payload;
+//import org.jclouds.io.Payload;
 
 import java.util.List;
 import java.util.Optional;
@@ -44,7 +45,8 @@ public interface ObjectStorageClient {
     /**
      * @return a list of {@link StorageObject}.
      */
-    List<StorageObject> list();
+//    List<StorageObject> list();
+    List<S3Object> list();
 
     /**
      * Check if an object with the provided id exists
@@ -60,7 +62,7 @@ public interface ObjectStorageClient {
      * @param value corresponds to {@link StorageObject#getPayload()}.
      * @return {@link StorageObject#getETag()} of the object.
      */
-    String put(String id, Payload value);
+//    String put(String id, Payload value);
 
     /**
      * Creates or updates a {@link StorageObject}.
@@ -68,7 +70,8 @@ public interface ObjectStorageClient {
      * @param storageObject corresponds to {@link StorageObject#getName()}.
      * @return {@link StorageObject#getETag()} of the object.
      */
-    String put(StorageObject storageObject);
+//    String put(StorageObject storageObject);
+    String put(S3Object s3Object);
 
     /**
      * Gets the {@link StorageObject} metadata without its {@link Payload#openStream() body}.
@@ -76,7 +79,8 @@ public interface ObjectStorageClient {
      * @param objectName corresponds to {@link StorageObject#getName()}.
      * @return the {@link StorageObject} or empty {@code Optional}, if not found.
      */
-    Optional<StorageObject> getWithoutBody(String objectName);
+//    Optional<StorageObject> getWithoutBody(String objectName);
+    Optional<S3Object> getWithoutBody(String objectName);
 
     /**
      * Gets the {@link StorageObject} including its {@link Payload#openStream() body}.
@@ -86,7 +90,10 @@ public interface ObjectStorageClient {
      * @param objectName corresponds to {@link StorageObject#getName()}.
      * @return the {@link StorageObject} or empty {@code Optional}, if not found.
      */
-    Optional<StorageObject> get(String objectName);
+//    Optional<StorageObject> get(String objectName);
+
+    Optional<S3Object> get(String objectName);
+
 
     /**
      * Gets the {@link StorageObject} including its {@link Payload#openStream() body}.
@@ -97,7 +104,8 @@ public interface ObjectStorageClient {
      * @return the {@link StorageObject} or empty {@code Optional}, if not found.
      * @throws ContentValidationException thrown when verification of the validity of downloaded content fails.
      */
-    Optional<StorageObject> get(String objectName, boolean verify) throws ContentValidationException;
+//    Optional<StorageObject> get(String objectName, boolean verify) throws ContentValidationException;
+    Optional<S3Object> get(String objectName, boolean verify) throws ContentValidationException;
 
     /**
      * Get the content of the specified object and return it as a byte array. This is the recommended (fastest)
@@ -105,14 +113,14 @@ public interface ObjectStorageClient {
      * @param objectName corresponds to {@link StorageObject#getName()}.
      * @return byte array representing the retrieved object, or empty byte array if no object was retrieved
      */
-    byte[] getContent(String objectName);
+//    byte[] getContent(String objectName);
 
     /**
      * Get the metadata of the specified object
      * @param objectName corresponds to {@link StorageObject#getName()}.
      * @return ObjectMetadata of the requests object or null if not found.
      */
-    ObjectMetadata getMetaData(String objectName);
+//    ObjectMetadata getMetaData(String objectName);
 
     /**
      * Deletes an object, if present.

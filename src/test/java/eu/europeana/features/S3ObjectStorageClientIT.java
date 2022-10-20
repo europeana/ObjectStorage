@@ -1,6 +1,7 @@
 package eu.europeana.features;
 
 import com.amazonaws.services.s3.model.Bucket;
+import com.amazonaws.services.s3.model.ObjectListing;
 import eu.europeana.domain.ContentValidationException;
 import eu.europeana.domain.StorageObject;
 import org.apache.logging.log4j.LogManager;
@@ -319,7 +320,7 @@ public class S3ObjectStorageClientIT {
     public void testListObjects() {
         deleteOldTestObject(TEST_OBJECT_NAME);
 
-        List<StorageObject> list = client.list();
+        ObjectListing list = client.list();
         int count = list.size();
         LOG.info("Checking "+count+" storage objects...");
         int i = 0;

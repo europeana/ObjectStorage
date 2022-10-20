@@ -16,10 +16,12 @@
  */
 package eu.europeana.domain;
 
+import com.amazonaws.services.s3.model.S3Object;
+import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.google.common.base.Objects;
 import com.google.common.base.MoreObjects.ToStringHelper;
-import eu.europeana.features.ObjectStorageClient;
-import org.jclouds.io.Payload;
+//import eu.europeana.features.ObjectStorageClient;
+//import org.jclouds.io.Payload;
 
 import java.net.URI;
 import java.util.Date;
@@ -39,7 +41,10 @@ public class StorageObject implements Comparable<StorageObject> {
 
     private final String name;
     private final URI uri;
-    private final Payload payload;
+//    private final Payload payload;
+
+    private final S3Object s3Object;
+//    private ObjectMetadata metadata;
     private ObjectMetadata metadata;
 
     /**
@@ -49,20 +54,44 @@ public class StorageObject implements Comparable<StorageObject> {
      * @param metadata optional, metadata of the stored object
      * @param payload optional, payload of the stored object
      */
-    public StorageObject(String name, URI uri, ObjectMetadata metadata, Payload payload) {
+//    public StorageObject(String name, URI uri, ObjectMetadata metadata, Payload payload) {
+//        this.name = checkNotNull(name, "name");
+//        this.uri = uri;
+//        this.metadata = metadata;
+//        if (this.metadata == null) {
+//            this.metadata = new ObjectMetadata();
+//            // we want to at least set the content length, to optimize transfer speed
+//            if (payload == null) {
+//                this.metadata.setContentLength(0);
+//            } else {
+//                this.metadata.setContentLength(payload.getContentMetadata().getContentLength());
+//            }
+//        }
+//        this.payload = payload;
+//    }
+
+
+    /**
+     * Create a new storage object. If no metadata is provided a basic one will be generated
+     * @param name required field
+     * @param uri required, uri of the stored object
+     * @param metadata optional, metadata of the stored object
+     * @param payload optional, payload of the stored object
+     */
+    public StorageObject(String name, URI uri, ObjectMetadata metadata, S3Object s3Object) {
         this.name = checkNotNull(name, "name");
         this.uri = uri;
         this.metadata = metadata;
         if (this.metadata == null) {
             this.metadata = new ObjectMetadata();
             // we want to at least set the content length, to optimize transfer speed
-            if (payload == null) {
+            if (s3Object == null) {
                 this.metadata.setContentLength(0);
             } else {
-                this.metadata.setContentLength(payload.getContentMetadata().getContentLength());
+                this.metadata.setContentLength(s3Object.getObjectMetadata().getContentLength());
             }
         }
-        this.payload = payload;
+        this.s3Object = s3Object;
     }
 
     /**
@@ -91,6 +120,10 @@ public class StorageObject implements Comparable<StorageObject> {
      */
     public Date getLastModified() {
         return metadata.getLastModified();
+    }
+
+    public S3Object getS3Object() {
+        return s3Object;
     }
 
     /**
@@ -154,7 +187,7 @@ public class StorageObject implements Comparable<StorageObject> {
     }
 
     public ObjectMetadata getMetadata() {
-        return metadata;
+        return s3Object.getObjectMetadata();
     }
 
     public void setMetadata(ObjectMetadata metadata) {
