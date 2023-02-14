@@ -4,12 +4,15 @@
     <parent>
         <groupId>eu.europeana</groupId>
         <artifactId>europeana-parent-pom</artifactId>
-        <version>2.3</version>
+        <version>2.4</version>
     </parent>
 
     <groupId>eu.europeana</groupId>
     <artifactId>object-storage</artifactId>
     <version>1.11-SNAPSHOT</version>
+    
+    <name>Object Storage library</name>
+    <description>Java Library for storing and retrieving items in S3</description>
 
     <scm>
         <developerConnection>scm:git:https://github.com/europeana/ObjectStorage.git</developerConnection>
@@ -94,7 +97,7 @@
                      To skip (e.g. during debugging) use 'mvn clean package')-->
                 <groupId>org.owasp</groupId>
                 <artifactId>dependency-check-maven</artifactId>
-                <version>6.5.0</version>
+                <version>8.1.0</version>
                 <configuration>
                     <failBuildOnCVSS>7</failBuildOnCVSS>
                     <suppressionFiles>
