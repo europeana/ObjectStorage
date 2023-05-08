@@ -81,10 +81,12 @@
         </dependency>
 
         <!-- Overriding to remove CVE-2020-36518, CVE-2022-42003, CVE-2022-42004-->
+        <!-- CVE-2022-45688 still there in latest version coming from transitive dependency hutool-json -->
+        <!-- Also present in the latest version of hutool-json-5.8.18.jar  Hence suppressed it-->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>2.14.1</version>
+            <version>2.15.0</version>
         </dependency>
 
     </dependencies>

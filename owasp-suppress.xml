@@ -18,4 +18,11 @@
         <cve>CVE-2020-12691</cve>
         <cve>CVE-2020-12690</cve>
     </suppress>
+    <suppress>
+        <notes><![CDATA[
+   file name: jackson-core-2.15.0.jar
+   ]]></notes>
+        <packageUrl regex="true">^pkg:maven/com.fasterxml.jackson.core/jackson-core@.*$</packageUrl>
+        <cve>CVE-2022-45688</cve>
+    </suppress>
 </suppressions>
