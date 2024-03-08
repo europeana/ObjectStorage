@@ -22,6 +22,7 @@ import eu.europeana.domain.ObjectMetadata;
 import eu.europeana.domain.StorageObject;
 import org.jclouds.io.Payload;
 
+import java.io.InputStream;
 import java.util.List;
 import java.util.Optional;
 
@@ -48,7 +49,7 @@ public interface ObjectStorageClient {
 
     /**
      * Check if an object with the provided id exists
-     * @param id
+     * @param id id of the object to check
      * @return true if it exists, false if it does not exist
      */
     boolean isAvailable(String id);
@@ -100,12 +101,19 @@ public interface ObjectStorageClient {
     Optional<StorageObject> get(String objectName, boolean verify) throws ContentValidationException;
 
     /**
-     * Get the content of the specified object and return it as a byte array. This is the recommended (fastest)
-     * method of retrieving media content like images.
-     * @param objectName corresponds to {@link StorageObject#getName()}.
+     * Get the content of the specified object and return it as a byte array.
+     * @param objectName id/name of the object to retrieve
      * @return byte array representing the retrieved object, or empty byte array if no object was retrieved
      */
     byte[] getContent(String objectName);
+
+    /**
+     * Get the content of the specified object as a byte stream.
+     * This is often the fastest method to retrieve data. Do remember to close the stream when you're done.
+     * @param objectName id/name of the object to retrieve
+     * @return stream containing content as byte array.
+     */
+    InputStream getContentAsStream(String objectName);
 
     /**
      * Get the metadata of the specified object

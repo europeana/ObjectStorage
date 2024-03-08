@@ -34,6 +34,8 @@ public class S3ObjectStorageClientIT {
 
     private static final Logger LOG = LogManager.getLogger(S3ObjectStorageClientIT.class);
 
+    private static final int NANO_TO_SEC = 1000_000;
+
     private static boolean runBluemixTest = true;
 
     private static final String TEST_OBJECT_NAME = "test-object";
@@ -44,7 +46,9 @@ public class S3ObjectStorageClientIT {
 
     // we time the various retrieval methods to see which is fastest
     private static long nrItems = 0;
-    private static long timingContent = 0;
+
+    private static long timingContentBytes = 0;
+    private static long timingContentStream = 0;
     private static long timingMetadata = 0;
     private static long timingSONoPayload = 0;
     private static long timingSOPayloadVerify = 0;
@@ -104,31 +108,39 @@ public class S3ObjectStorageClientIT {
     }
 
     /**
-     * We support 3 different methods to retrieve data, in this method we test all 3
+     * We support different methods to retrieve data, in this method we test all
      * @throws eu.europeana.domain.ContentValidationException
      */
-    private void testRetrieval(String id) throws ContentValidationException {
+    private void testRetrieval(String id) throws ContentValidationException, IOException {
 
         long start;
         Optional<StorageObject> optional;
         StorageObject storageObject;
         assertTrue("Can't test retrieval of object that is not available", client.isAvailable(id));
 
-        // retrieve content as bytes
+        // 1. retrieve content as bytes
         start = System.nanoTime();
-        byte[] content = client.getContent(id);
-        timingContent += (System.nanoTime() - start);
+        byte[] content2 = client.getContent(id);
+        timingContentBytes += (System.nanoTime() - start);
+        assertNotNull(content2);
+        assertEquals(TEST_OBJECT_DATA, new String(content2));
 
-        assertNotNull(content);
-        assertEquals(TEST_OBJECT_DATA, new String(content));
+        // 2. retrieve content as stream
+        start = System.nanoTime();
+        try (InputStream contentStream = client.getContentAsStream(id)) {
+            byte[] content = contentStream.readAllBytes();
+            timingContentStream += (System.nanoTime() - start);
+            assertNotNull(content);
+            assertEquals(TEST_OBJECT_DATA, new String(content));
+        }
 
-        // retrieve metadata directly
+        // 3. retrieve metadata only
         start = System.nanoTime();
         eu.europeana.domain.ObjectMetadata metadata = client.getMetaData(id);
         timingMetadata += (System.nanoTime() - start);
         assertNotNull(metadata);
 
-        // retrieve as storageobject without payload
+        // 4. retrieve as storageobject without payload
         start = System.nanoTime();
         optional = client.getWithoutBody(id);
         timingSONoPayload += (System.nanoTime() - start);
@@ -140,7 +152,7 @@ public class S3ObjectStorageClientIT {
         assertNotNull(storageObject.getLastModified());
         assertEquals(0, getRawContent(storageObject).length);
 
-        // retrieve as storageobject with payload without verification
+        // 5. retrieve as storageobject with payload without verification
         start = System.nanoTime();
         optional = client.get(id);
         timingSOPayloadNoVerify += (System.nanoTime() - start);
@@ -209,7 +221,7 @@ public class S3ObjectStorageClientIT {
      * Tests if we can put (using key and payload value), get and delete a simple object properly
      */
     @Test
-    public void testUploadKeyPayload() throws ContentValidationException {
+    public void testUploadKeyPayload() throws ContentValidationException, IOException {
         deleteOldTestObject(TEST_OBJECT_NAME);
 
         Payload payload = new ByteArrayPayload(TEST_OBJECT_DATA.getBytes());
@@ -356,11 +368,12 @@ public class S3ObjectStorageClientIT {
     @AfterClass
     public static void printTimings() {
         LOG.info("Time spend on retrieval of {} items...", nrItems);
-        LOG.info("  Content directly                      : {} ", timingContent/1000000);
-        LOG.info("  Metadata directly                     : {} ", timingMetadata/1000000);
-        LOG.info("  StorageObject no payload              : {} ", timingSONoPayload/1000000);
-        LOG.info("  StorageObject payload, no verification: {} ", timingSOPayloadNoVerify/1000000);
-        LOG.info("  StorageObject payload, verification   : {} ", timingSOPayloadVerify/1000000);
+        LOG.info("  Content directly as bytes             : {} ", timingContentBytes / NANO_TO_SEC);
+        LOG.info("  Content directly as bytes via stream  : {} ", timingContentStream / NANO_TO_SEC);
+        LOG.info("  Metadata directly                     : {} ", timingMetadata / NANO_TO_SEC);
+        LOG.info("  StorageObject no payload              : {} ", timingSONoPayload / NANO_TO_SEC);
+        LOG.info("  StorageObject payload, no verification: {} ", timingSOPayloadNoVerify / NANO_TO_SEC);
+        LOG.info("  StorageObject payload, verification   : {} ", timingSOPayloadVerify / NANO_TO_SEC);
     }
 
 }

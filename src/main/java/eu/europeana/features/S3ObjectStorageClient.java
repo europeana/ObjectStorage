@@ -34,7 +34,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.*;
 
 /**
- * Client for accessing objects stored on (Amazon or Bluemix or ...) S3 service.
+ * Client for accessing objects stored on Amazon or IBM S3 service.
  * Created by jeroen on 14-12-16; adapted to IBM Bluemix S3 by Luthien, Jan 18
  */
 public class S3ObjectStorageClient implements ObjectStorageClient {
@@ -330,6 +330,14 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
         return result;
     }
 
+    /**
+     *
+     * @see eu.europeana.features.ObjectStorageClient#getContentAsStream(String)
+     */
+    public InputStream getContentAsStream(String objectName) {
+        return retrieveAsStream(objectName).getDelegateStream();
+    }
+
     private ObjectMetadata getObjectMetaData(String id) {
         com.amazonaws.services.s3.model.ObjectMetadata s3data = client.getObjectMetadata(bucketName, id);
         return new ObjectMetadata(s3data.getRawMetadata());
@@ -451,13 +459,11 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
 
     /**
      * Retrieve an object and return it's content only as a byte[].
-     * Note that this is much faster than the retrieveStorageObject()
-     * @param id
-     * @return
+     * Note that this is much faster than the retrieveStorageObject() method
      */
     private byte[] retrieveAsBytes(String id) {
         try (S3Object object = client.getObject(bucketName, id)) {
-            return IOUtils.toByteArray(object.getObjectContent());
+            return object.getObjectContent().readAllBytes();
         } catch (IOException e) {
             LOG.error(ERROR_MSG_RETRIEVE, id, e);
         }
@@ -465,8 +471,18 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     }
 
     /**
+     * Retrieve an object and return it's content only, as a stream
+     * This is probaby the fastest method, and even a tiny bit faster than retrieveAsBytes but the client using the
+     * stream needs to remember to close it afterwards
+     */
+    private S3ObjectInputStream retrieveAsStream(String id) {
+        S3Object s3object = client.getObject(bucketName, id);
+        return s3object.getObjectContent();
+    }
+
+    /**
      * Create a new bucket with the provided name and switch to this new bucket
-     * @param bucketName
+     * @param bucketName name of the bucket to create
      * @return the newly created bucket
      */
     public Bucket createBucket(String bucketName) {
@@ -484,7 +500,7 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
 
     /**
      * Delete a bucket (requires admin privileges)
-     * @param bucket
+     * @param bucket name of the bucket to delete
      */
     public void deleteBucket(String bucket) {
         client.deleteBucket(bucket);
