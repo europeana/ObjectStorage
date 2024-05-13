@@ -34,7 +34,7 @@ public class S3ObjectStorageClientIT {
 
     private static final Logger LOG = LogManager.getLogger(S3ObjectStorageClientIT.class);
 
-    private static final int NANO_TO_SEC = 1000_000;
+    private static final int NANO_TO_MS = 1000_000;
 
     private static boolean runBluemixTest = true;
 
@@ -368,12 +368,12 @@ public class S3ObjectStorageClientIT {
     @AfterClass
     public static void printTimings() {
         LOG.info("Time spend on retrieval of {} items...", nrItems);
-        LOG.info("  Content directly as bytes             : {} ", timingContentBytes / NANO_TO_SEC);
-        LOG.info("  Content directly as bytes via stream  : {} ", timingContentStream / NANO_TO_SEC);
-        LOG.info("  Metadata directly                     : {} ", timingMetadata / NANO_TO_SEC);
-        LOG.info("  StorageObject no payload              : {} ", timingSONoPayload / NANO_TO_SEC);
-        LOG.info("  StorageObject payload, no verification: {} ", timingSOPayloadNoVerify / NANO_TO_SEC);
-        LOG.info("  StorageObject payload, verification   : {} ", timingSOPayloadVerify / NANO_TO_SEC);
+        LOG.info("  Content directly as bytes             : {} ", timingContentBytes / NANO_TO_MS);
+        LOG.info("  Content directly as bytes via stream  : {} ", timingContentStream / NANO_TO_MS);
+        LOG.info("  Metadata directly                     : {} ", timingMetadata / NANO_TO_MS);
+        LOG.info("  StorageObject no payload              : {} ", timingSONoPayload / NANO_TO_MS);
+        LOG.info("  StorageObject payload, no verification: {} ", timingSOPayloadNoVerify / NANO_TO_MS);
+        LOG.info("  StorageObject payload, verification   : {} ", timingSOPayloadVerify / NANO_TO_MS);
     }
 
 }
