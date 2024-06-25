@@ -140,34 +140,6 @@ public class S3ObjectStorageClient {
     }
 
     /**
-     *
-     * @return ObjectListing for iterating over all object stored in the bucket
-     * @deprecated
-     */
-    @Deprecated(since="june 2024")
-    public ObjectListing list() {
-        return s3Client.listObjects(bucketName);
-    }
-
-    /**
-     * Returns a list with summary information of all objects stored in the bucket
-     * Be careful when using this method because for buckets with many objects it will be slow and can lead to OOM
-     * exceptions.
-     * @return a list of S3ObjectSummaries
-     * @deprecated
-     */
-    @Deprecated(since="june 2024")
-    public List<S3ObjectSummary> listAll() {
-        ObjectListing objectListing = s3Client.listObjects(bucketName);
-        List<S3ObjectSummary> results = objectListing.getObjectSummaries();
-        while (objectListing.isTruncated()) {
-            objectListing = s3Client.listNextBatchOfObjects(objectListing);
-            results.addAll(objectListing.getObjectSummaries());
-        }
-        return results;
-    }
-
-    /**
      * Return a ListObjectsV2Result with summary information of all objects stored in the bucket (1000 results
      * per batch).
      * Note that you'll need to get the continuationToken to see if there are more results
@@ -180,18 +152,18 @@ public class S3ObjectStorageClient {
 
     /**
      * Return a ListObjectsV2Result with summary information of all objects stored in the bucket with
-     * maxBatchSize results per batch.
+     * maxPageSize results per page/batch
      * Note that you'll need to get the continuationToken to see if there are more results
      * @param continuationToken token to get next batch of objects (provide null for first request)
-     * @param maxBatchSize maximum number of results returned per batch/page
+     * @param maxPageSize maximum number of results returned per batch/page
      * @return ListObjectsV2Result
      */
-    public ListObjectsV2Result listAll(String continuationToken, Integer maxBatchSize) {
+    public ListObjectsV2Result listAll(String continuationToken, Integer maxPageSize) {
         ListObjectsV2Request listObjectsV2Request = new ListObjectsV2Request()
                 .withBucketName(this.bucketName)
                 .withContinuationToken(continuationToken);
-        if (maxBatchSize != null) {
-            listObjectsV2Request.setMaxKeys(maxBatchSize);
+        if (maxPageSize != null) {
+            listObjectsV2Request.setMaxKeys(maxPageSize);
         }
         return s3Client.listObjectsV2(listObjectsV2Request);
     }

@@ -100,22 +100,6 @@ public class S3ObjectStorageClientIT {
      * Note that this will only work if the used bucket doesn't contain lots of objects, otherwise this test may raise
      * an OOM
      */
-    @Deprecated
-    @Test
-    public void testListAllObjects() {
-        List<S3ObjectSummary> list = client.listAll();
-        int count = list.size();
-        LOG.info("Checking {} storage objects in bucket {}...", count, client.getBucketName());
-        assertTrue(count > 1000);
-        for (S3ObjectSummary s3ObjectSummary : list) {
-            assertNotNull(s3ObjectSummary);
-        }
-    }
-
-    /**
-     * Note that this will only work if the used bucket doesn't contain lots of objects, otherwise this test may raise
-     * an OOM
-     */
     @Test
     public void testListAllObjectsWithToken() {
         String continuationToken = null;
