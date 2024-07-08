@@ -9,91 +9,86 @@ import com.amazonaws.client.builder.AwsClientBuilder;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
-import com.amazonaws.services.s3.S3ClientOptions;
 import com.amazonaws.services.s3.model.*;
 import com.amazonaws.util.BinaryUtils;
-import com.amazonaws.util.IOUtils;
-import eu.europeana.domain.ContentValidationException;
-import eu.europeana.domain.ObjectMetadata;
-import eu.europeana.domain.ObjectStorageClientException;
-import eu.europeana.domain.StorageObject;
+import eu.europeana.exception.S3ObjectStorageException;
+import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpStatus;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.jclouds.io.Payload;
-import org.jclouds.io.payloads.ByteArrayPayload;
 
 import java.io.ByteArrayInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.*;
+import java.util.List;
 
 /**
  * Client for accessing objects stored on Amazon or IBM S3 service.
  * Created by jeroen on 14-12-16; adapted to IBM Bluemix S3 by Luthien, Jan 18
+ * Completely revised June 2024 by Patrick Ehlert
  */
-public class S3ObjectStorageClient implements ObjectStorageClient {
+public class S3ObjectStorageClient {
 
     private static final Logger LOG = LogManager.getLogger(S3ObjectStorageClient.class);
 
-    private static final String ERROR_MSG_RETRIEVE                      = "Error retrieving storage object {}";
-    private static final String OBJECT_STORAGE_PROPERTY_FILE            = "objectstorage.properties";
-    private static final String VALIDATE_AFTER_INACTIVITY_PROPERTY      = "s3.validate.after.inactivity";
-    private static final int    VALIDATE_AFTER_INACTIVITY_DEFAULT_VALUE = 2000;
+    private static final String ERROR_MSG_RETRIEVE  = "Error retrieving storage object ";
 
-    private AmazonS3 client;
-    private String bucketName;
+    private final AmazonS3 s3Client;
+    private final String bucketName;
     private boolean isIbmCloud = false;
 
     /**
-     * Create a new S3 client for Amazon S3 with client configuration
-     * To resolve the stale http connection issue, which gave us "The target server failed to respond" error,
-     * we have added validateAfterInactivity in the Amazon S3 configuration (See EA-1891)
-     * Default value of validateAfterInactivity is 2000 ms
-     * @param clientKey
-     * @param secretKey
-     * @param region
-     * @param bucketName
+     * Creates a new S3 client for Amazon S3
+     * @param clientKey client key
+     * @param secretKey client secret
+     * @param region bucket region
+     * @param bucketName bucket name
+     * @param validateAfterInactivity optional, to resolve the stale http connection issue ("The target server failed to
+     *                                respond" errors, see EA-1891), you can set an validateAfterInactivity
      */
-    public S3ObjectStorageClient(String clientKey, String secretKey, String region, String bucketName) {
-        Properties props = loadProperties(OBJECT_STORAGE_PROPERTY_FILE, true);
-
+    public S3ObjectStorageClient(String clientKey, String secretKey, String region, String bucketName, Integer validateAfterInactivity) {
         AWSCredentials credentials = new BasicAWSCredentials(clientKey, secretKey);
         // setting client configuration
-        ClientConfiguration clientConfiguration = new ClientConfiguration()
-               .withValidateAfterInactivityMillis(getValidateAfterInactivity(props));
-        client = AmazonS3ClientBuilder.standard()
-                .withCredentials(new AWSStaticCredentialsProvider(credentials))
-                .withRegion(region)
-                .withClientConfiguration(clientConfiguration)
-                .build();
+        if (validateAfterInactivity != null) {
+            ClientConfiguration clientConfiguration = new ClientConfiguration()
+                    .withValidateAfterInactivityMillis(validateAfterInactivity);
+            s3Client = AmazonS3ClientBuilder.standard()
+                    .withCredentials(new AWSStaticCredentialsProvider(credentials))
+                    .withRegion(region)
+                    .withClientConfiguration(clientConfiguration)
+                    .build();
+        } else {
+            s3Client = AmazonS3ClientBuilder.standard()
+                    .withCredentials(new AWSStaticCredentialsProvider(credentials))
+                    .withRegion(region)
+                    .build();
+        }
         this.bucketName = bucketName;
         LOG.info("Connected to Amazon S3 bucket {}, region {}, validateAfterInactivity {} ms ", bucketName, region,
-                clientConfiguration.getValidateAfterInactivityMillis());
+                validateAfterInactivity);
     }
 
     /**
      * Create a new S3 client for IBM Cloud/Bluemix. Calling this constructor sets the boolean isBlueMix
      * to true; it is used to switch to the correct way of constructing the Object URI when using resource path
      * addressing (used by Bluemix) instead of virtual host addressing (default usage with Amazon S3).
-     * Also note that the region parameter is superfluous, but I will maintain it for now in order to be able to
+     * Also note that the region parameter is superfluous, but we will maintain it for now in order to be able to
      * overload the constructor (using 5 Strings, hence different from the other two)
-     * @param clientKey
-     * @param secretKey
-     * @param region
-     * @param bucketName
-     * @param endpoint
+     * @param clientKey client key
+     * @param secretKey client secret
+     * @param region bucket region
+     * @param bucketName bucket name
+     * @param endpoint endpoint to use
      */
     public S3ObjectStorageClient(String clientKey, String secretKey, String region, String bucketName, String endpoint) {
         System.setProperty("com.amazonaws.sdk.disableDNSBuckets", "True");
 
         BasicAWSCredentials creds = new BasicAWSCredentials(clientKey, secretKey);
-        client = AmazonS3ClientBuilder.standard()
+        s3Client = AmazonS3ClientBuilder.standard()
                 .withCredentials(new AWSStaticCredentialsProvider(creds))
                 .withPathStyleAccessEnabled(true)
                 .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(endpoint, region))
@@ -104,16 +99,16 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     }
 
     /**
-     * Create a new S3 client and specify an endpoint and options
-     * @param clientKey
-     * @param secretKey
-     * @param bucketName
-     * @param endpoint
-     * @param s3ClientOptions
+     * Create a new S3 client and specify an endpoint and client options
+     * @param clientKey client key
+     * @param secretKey client secret
+     * @param bucketName bucket name
+     * @param endpoint endpoint to use
+     * @param s3ClientOptions client options to use
      */
     public S3ObjectStorageClient(String clientKey, String secretKey, String bucketName, String endpoint, ClientConfiguration s3ClientOptions) {
         BasicAWSCredentials creds = new BasicAWSCredentials(clientKey, secretKey);
-        client = AmazonS3ClientBuilder.standard()
+        s3Client = AmazonS3ClientBuilder.standard()
                 .withCredentials(new AWSStaticCredentialsProvider(creds))
                 .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(endpoint, null))
                 .withClientConfiguration(s3ClientOptions)
@@ -124,389 +119,247 @@ public class S3ObjectStorageClient implements ObjectStorageClient {
     }
 
     /**
-     *  Loads a property file
+     *  @return the name of this object storage provider
      */
-    private static Properties loadProperties(String fileName, boolean required) {
-        Properties prop = new Properties();
-        try (InputStream inputStream = Thread.currentThread().getContextClassLoader().getResourceAsStream(fileName)) {
-            if (inputStream == null) {
-                if (required) {
-                    throw new FileNotFoundException("Please provide " + fileName + " file");
-                } else {
-                    LOG.warn("Property file {} not found", fileName);
-                }
-            }
-            prop.load(inputStream);
-        } catch (IOException e) {
-            LOG.error("Error reading the property file {} ", fileName, e);
-        }
-        return prop;
-    }
-
-    /**
-     * Gets the value of s3.validate.after.inactivity from loaded properties
-     * @return value present or default value 2000 ms
-     */
-    private static int getValidateAfterInactivity(Properties props) {
-        String value = props.getProperty(VALIDATE_AFTER_INACTIVITY_PROPERTY);
-        return (value != null ? Integer.parseInt(value) : VALIDATE_AFTER_INACTIVITY_DEFAULT_VALUE);
-    }
-
-    /**
-     * @see ObjectStorageClient#getName()
-     */
-    @Override
-    public String getName() {
+    public String getServiceName() {
         return (isIbmCloud ? "IBM Cloud S3" : "Amazon S3");
     }
 
     /**
-     * @see ObjectStorageClient#getBucketName()
+     * @return the name of the bucket that is being used
      */
-    @Override
     public String getBucketName() {
         return bucketName;
-    }
-
-    /**
-     * @see ObjectStorageClient#list()
-     */
-    @Override
-    public List<StorageObject> list() {
-        ObjectListing objectListing = client.listObjects(bucketName);
-        List<S3ObjectSummary> results = objectListing.getObjectSummaries();
-        ArrayList<StorageObject> storageObjects = new ArrayList<>();
-        for (S3ObjectSummary so : results) {
-            storageObjects.add(toStorageObject(so));
-        }
-        while (objectListing.isTruncated()) {
-            objectListing = client.listNextBatchOfObjects(objectListing);
-            for (S3ObjectSummary so : objectListing.getObjectSummaries()) {
-                storageObjects.add(toStorageObject(so));
-            }
-        }
-        return storageObjects;
-    }
-
-    /**
-     * @see ObjectStorageClient#isAvailable(String)
-     */
-    @Override
-    public boolean isAvailable(String id) {
-        return client.doesObjectExist(bucketName, id);
-    }
-
-    public void setEndpoint(String endpoint) {
-        client.setEndpoint(endpoint);
-    }
-
-    private StorageObject toStorageObject(S3ObjectSummary so) {
-        URI uri = getUri(so.getKey());
-        ObjectMetadata metadata = new ObjectMetadata();
-        metadata.setLastModified(so.getLastModified());
-        metadata.setETag(so.getETag());
-        metadata.setContentLength(so.getSize());
-        return new StorageObject(so.getKey(), uri, metadata, null);
-    }
-
-    private URI getUri(String key) {
-        if (isIbmCloud) {
-            return URI.create(client.getUrl(bucketName, key).toString());
-        } else {
-            String bucketLocation = client.getRegionName();
-            return URI.create(bucketLocation + "/" + key);
-        }
-    }
-
-    /**
-     * @see ObjectStorageClient#put(StorageObject)
-     */
-    @Override
-    public String put(StorageObject storageObject) {
-        com.amazonaws.services.s3.model.ObjectMetadata metadata = new com.amazonaws.services.s3.model.ObjectMetadata();
-        metadata.setContentType(storageObject.getMetadata().getContentType());
-        metadata.setContentLength(storageObject.getMetadata().getContentLength());
-        metadata.setContentMD5(storageObject.getMetadata().getContentMD5());
-
-        PutObjectResult putObjectResult = null;
-        try (InputStream inputStream = storageObject.getPayload().openStream()) {
-            putObjectResult = client.putObject(new PutObjectRequest(bucketName, storageObject.getName(), inputStream, checkMetaData(metadata)));
-        } catch (IOException e) {
-            LOG.error("Error storing object {}", storageObject.getName(), e);
-        }
-        return (putObjectResult == null ? null : putObjectResult.getETag());
-    }
-
-    /**
-     * @see ObjectStorageClient#put(String, Payload)
-     */
-    @Override
-    @SuppressWarnings("squid:S2070") // ignore SonarQube MD5 warnings because we have no choice but to use that
-    public String put(String key, Payload value) {
-        com.amazonaws.services.s3.model.ObjectMetadata metadata = new com.amazonaws.services.s3.model.ObjectMetadata();
-        byte[] content = new byte[0];
-
-        try {
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            try (DigestInputStream dis = new DigestInputStream(value.openStream(), md)) {
-                content = IOUtils.toByteArray(dis);
-                metadata.setContentMD5(BinaryUtils.toBase64(md.digest()));
-            }
-        } catch (NoSuchAlgorithmException e) {
-            LOG.error("Cannot calculate MD5 hash of because no MD5 algorithm was found",e );
-        } catch (IOException e) {
-            LOG.error("Error reading payload for key {}", key, e);
-        }
-        Integer intLength = Integer.valueOf(content.length);
-        metadata.setContentLength(intLength.longValue());
-
-        // TODO figure out if we really need to create a new stream here or can make it more efficient by using the previously used stream
-        PutObjectResult putObjectResult = null;
-        try (InputStream is = new ByteArrayInputStream(content) ){
-            putObjectResult = client.putObject(new PutObjectRequest(bucketName, key, is, checkMetaData(metadata)));
-        } catch (IOException e) {
-            LOG.error("Error storing object with key {}", key, e);
-        }
-
-        return (putObjectResult == null ? null : putObjectResult.getETag());
-    }
-
-    private com.amazonaws.services.s3.model.ObjectMetadata checkMetaData(com.amazonaws.services.s3.model.ObjectMetadata metadata) {
-        if (metadata.getContentLength() == 0L) {
-            throw new ObjectStorageClientException("The metadata ContentLength is mandatory");
-        }
-        return metadata;
-    }
-
-    /**
-     * @see ObjectStorageClient#getWithoutBody(String)
-     */
-    @Override
-    public Optional<StorageObject> getWithoutBody(String objectName) {
-        try {
-            return Optional.ofNullable(retrieveAsStorageObject(objectName, false, false));
-        } catch (ContentValidationException | AmazonS3Exception e) {
-            throw new ObjectStorageClientException(ERROR_MSG_RETRIEVE + objectName + " without body", e);
-        }
-    }
-
-    /**
-     * @see eu.europeana.features.ObjectStorageClient#get(String)
-     */
-    @Override
-    public Optional<StorageObject> get(String objectName) {
-        try {
-            return Optional.ofNullable(retrieveAsStorageObject(objectName, true, false));
-        } catch (ContentValidationException | AmazonS3Exception e) {
-            throw new ObjectStorageClientException(ERROR_MSG_RETRIEVE + objectName, e);
-        }
-    }
-
-    /**
-     * @see eu.europeana.features.ObjectStorageClient#get(String, boolean)
-     */
-    @Override
-    public Optional<StorageObject> get(String objectName, boolean verify) throws ContentValidationException {
-        try {
-            return Optional.ofNullable(retrieveAsStorageObject(objectName, true, verify));
-        } catch (AmazonS3Exception ex) {
-            throw new ObjectStorageClientException(ERROR_MSG_RETRIEVE + objectName, ex);
-        }
-    }
-
-    /**
-     * @see eu.europeana.features.ObjectStorageClient#getContent(String)
-     */
-    @Override
-    public byte[] getContent(String objectName) {
-        byte[] result = new byte[0];
-        try {
-            result = retrieveAsBytes(objectName);
-        } catch (AmazonS3Exception ex) {
-            if (!is404Exception(ex)) {
-                throw new ObjectStorageClientException(ERROR_MSG_RETRIEVE +objectName, ex);
-            }
-        }
-        return result;
-    }
-
-    /**
-     *
-     * @see eu.europeana.features.ObjectStorageClient#getContentAsStream(String)
-     */
-    public InputStream getContentAsStream(String objectName) {
-        return retrieveAsStream(objectName).getDelegateStream();
-    }
-
-    private ObjectMetadata getObjectMetaData(String id) {
-        com.amazonaws.services.s3.model.ObjectMetadata s3data = client.getObjectMetadata(bucketName, id);
-        return new ObjectMetadata(s3data.getRawMetadata());
-    }
-
-    /**
-     * @see eu.europeana.features.ObjectStorageClient#getMetaData(String)
-     */
-    @Override
-    public ObjectMetadata getMetaData(String id) {
-        try {
-            return getObjectMetaData(id);
-        } catch (AmazonS3Exception ex) {
-            if (!is404Exception(ex)) {
-                throw new ObjectStorageClientException(ERROR_MSG_RETRIEVE + id, ex);
-            }
-        }
-        return null;
-    }
-
-    /**
-     * @see ObjectStorageClient#delete(String)
-     */
-    @Override
-    public void delete(String objectName) {
-        DeleteObjectRequest deleteObjectRequest = new DeleteObjectRequest(bucketName, objectName);
-        client.deleteObject(deleteObjectRequest);
-    }
-
-    /**
-     * @see ObjectStorageClient#close()
-     */
-    @Override
-    public void close() {
-        LOG.info("Shutting down connections to {} ...", this.getName());
-        ((AmazonS3Client) client).shutdown();
-        // see also https://stackoverflow.com/questions/18069042/spring-mvc-webapp-schedule-java-sdk-http-connection-reaper-failed-to-stop
-        com.amazonaws.http.IdleConnectionReaper.shutdown();
-    }
-
-    /**
-     * Retrieve an object and return all information as a {@link StorageObject}}
-     * @param id
-     * @param getContent, if false then only metadata is retrieved
-     * @param verify if true then the MD5 hash of the content will be verified to check if it was downloaded correctly
-     * @return null if the object was not found (404 exception)
-     */
-    private StorageObject retrieveAsStorageObject(String id, boolean getContent, boolean verify) throws ContentValidationException {
-        StorageObject result = null;
-        if (getContent) {
-            try (S3Object object = client.getObject(bucketName, id)) {
-                result = getContent(object, verify);
-            } catch (IOException e) {
-                LOG.error("Error reading object content", e);
-            } catch (RuntimeException e) {
-                if (!is404Exception(e)) {
-                    LOG.error("Error reading object content ", e);
-                }
-            }
-        } else {
-            try {
-                ObjectMetadata metadata = getObjectMetaData(id);
-                result = new StorageObject(id, getUri(id), metadata, null);
-            } catch (RuntimeException e) {
-                if (!is404Exception(e)) {
-                    LOG.error("Error reading object content ", e);
-                }
-            }
-        }
-        return result;
-    }
-
-    private StorageObject getContent(S3Object object, boolean verify) throws IOException, ContentValidationException {
-        ObjectMetadata objectMetadata = new ObjectMetadata(object.getObjectMetadata().getRawMetadata());
-        ByteArrayPayload content;
-        try (S3ObjectInputStream contentStream = object.getObjectContent()) {
-            if (verify) {
-                content = readAndVerifyContent(contentStream, BinaryUtils.fromHex(objectMetadata.getETag()));
-            } else {
-                content = new ByteArrayPayload(IOUtils.toByteArray(contentStream));
-            }
-            content.close();
-        }
-        return new StorageObject(object.getKey(), getUri(object.getKey()), objectMetadata, content);
-    }
-
-    private boolean is404Exception(Exception e) {
-        return (e instanceof AmazonServiceException) &&
-                (((AmazonServiceException) e).getStatusCode() == HttpStatus.SC_NOT_FOUND);
-    }
-
-    /**
-     * Add a messageDigest to the provided stream and calculate the hash when reading is done.
-     * Then the hash is compared to the hash on the server.
-     * @param contentStream
-     * @param serverSideHash
-     * @return read and verified content from the stream
-     * @throws ContentValidationException, IOException
-     */
-    @SuppressWarnings("squid:S2070") // ignore SonarQube MD5 warnings because we have no choice but to use that
-    private ByteArrayPayload readAndVerifyContent(S3ObjectInputStream contentStream, byte[] serverSideHash) throws ContentValidationException, IOException {
-        ByteArrayPayload result = null;
-        try {
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            try (DigestInputStream dis = new DigestInputStream(contentStream, md)) {
-                result = new ByteArrayPayload(IOUtils.toByteArray(dis));
-                result.close();
-                byte[] streamHash = md.digest();
-                if (streamHash == null || serverSideHash == null || !Arrays.equals(streamHash, serverSideHash)) {
-                    throw new ContentValidationException("Error comparing retrieved content hash with server hash (content = "
-                            +Arrays.toString(streamHash)+ ", server = "+Arrays.toString(serverSideHash));
-                }
-            }
-        } catch (NoSuchAlgorithmException e) {
-            throw new ContentValidationException("Cannot verify MD5 hash of downloaded content because no MD5 algorithm was found",e );
-        }
-        return result;
-    }
-
-    /**
-     * Retrieve an object and return it's content only as a byte[].
-     * Note that this is much faster than the retrieveStorageObject() method
-     */
-    private byte[] retrieveAsBytes(String id) {
-        try (S3Object object = client.getObject(bucketName, id)) {
-            return object.getObjectContent().readAllBytes();
-        } catch (IOException e) {
-            LOG.error(ERROR_MSG_RETRIEVE, id, e);
-        }
-        return new byte[0];
-    }
-
-    /**
-     * Retrieve an object and return it's content only, as a stream
-     * This is probaby the fastest method, and even a tiny bit faster than retrieveAsBytes but the client using the
-     * stream needs to remember to close it afterwards
-     */
-    private S3ObjectInputStream retrieveAsStream(String id) {
-        S3Object s3object = client.getObject(bucketName, id);
-        return s3object.getObjectContent();
-    }
-
-    /**
-     * Create a new bucket with the provided name and switch to this new bucket
-     * @param bucketName name of the bucket to create
-     * @return the newly created bucket
-     */
-    public Bucket createBucket(String bucketName) {
-        Bucket result = client.createBucket(bucketName);
-        this.bucketName = bucketName;
-        return result;
     }
 
     /**
      * @return a list of all buckets
      */
     public List<Bucket> listBuckets() {
-        return client.listBuckets();
+        return s3Client.listBuckets();
     }
 
     /**
-     * Delete a bucket (requires admin privileges)
-     * @param bucket name of the bucket to delete
+     * Return a ListObjectsV2Result with summary information of all objects stored in the bucket (1000 results
+     * per batch).
+     * Note that you'll need to get the continuationToken to see if there are more results
+     * @param continuationToken token to get next batch of objects (provide null for first request)
+     * @return ListObjectsV2Result
      */
-    public void deleteBucket(String bucket) {
-        client.deleteBucket(bucket);
+    public ListObjectsV2Result listAll(String continuationToken) {
+        return listAll(continuationToken, null);
     }
 
-    public void setS3ClientOptions(S3ClientOptions s3ClientOptions) {
-        client.setS3ClientOptions(s3ClientOptions);
+    /**
+     * Return a ListObjectsV2Result with summary information of all objects stored in the bucket with
+     * maxPageSize results per page/batch
+     * Note that you'll need to get the continuationToken to see if there are more results
+     * @param continuationToken token to get next batch of objects (provide null for first request)
+     * @param maxPageSize maximum number of results returned per batch/page
+     * @return ListObjectsV2Result
+     */
+    public ListObjectsV2Result listAll(String continuationToken, Integer maxPageSize) {
+        ListObjectsV2Request listObjectsV2Request = new ListObjectsV2Request()
+                .withBucketName(this.bucketName)
+                .withContinuationToken(continuationToken);
+        if (maxPageSize != null) {
+            listObjectsV2Request.setMaxKeys(maxPageSize);
+        }
+        return s3Client.listObjectsV2(listObjectsV2Request);
     }
+
+    /**
+     * Check if an object with the provided id exists
+     * @param id id of the object to check
+     * @return true if it exists, false if it does not exist
+     */
+    public boolean isObjectAvailable(String id) {
+        return s3Client.doesObjectExist(bucketName, id);
+    }
+
+    /**
+     * Read the provided inputstream and generate object metadata containing the contentLength and MD5 hash.
+     * Note that generating the metadata is a relatively expensive operation.
+     * @param id optional, name of the object. Only displayed in case of errors
+     * @param inputStream inputstream for which to generate ObjectMetaData
+     * @return new object metadata
+     */
+    public ObjectMetadata generateObjectMetadata(String id, InputStream inputStream) {
+        ObjectMetadata metadata = new ObjectMetadata();
+        byte[] content = new byte[0];
+        try {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            try (DigestInputStream dis = new DigestInputStream(inputStream, md)) {
+                content = IOUtils.toByteArray(dis);
+                metadata.setContentMD5(BinaryUtils.toBase64(md.digest()));
+            }
+        } catch (NoSuchAlgorithmException e) {
+            LOG.error("Cannot calculate MD5 hash of because no MD5 algorithm was found",e );
+        } catch (IOException e) {
+            LOG.error("Error reading inputStream for object {}", id, e);
+        }
+        Integer intLength = Integer.valueOf(content.length);
+        metadata.setContentLength(intLength.longValue());
+        return metadata;
+    }
+
+    /**
+     * Generate object metadata containing the contentLength and MD5 hash of the provided byte array
+     * @param byteArray the byte array to read
+     * @return new object metadata
+     */
+    public ObjectMetadata generateObjectMetadata(byte[] byteArray) {
+        ObjectMetadata metadata = new ObjectMetadata();
+        try {
+            byte[] md5binary = MessageDigest.getInstance("MD5").digest(byteArray);
+            metadata.setContentMD5(BinaryUtils.toBase64(md5binary));
+        } catch (NoSuchAlgorithmException e) {
+            LOG.error("Cannot calculate MD5 hash of because no MD5 algorithm was found", e);
+        }
+        metadata.setContentLength(byteArray.length);
+        return metadata;
+    }
+
+    /**
+     * Creates a new object or updates an existing object in the S3 bucket
+     * @param id id of the object to create
+     * @param inputStream object to create as an inputstream
+     * @param objectMetadata metadata of the object to store
+     * @return the eTag of the object as created by S3 storage
+     */
+    public String putObject(String id, InputStream inputStream, ObjectMetadata objectMetadata) {
+        PutObjectResult putObjectResult = s3Client.putObject(new PutObjectRequest(bucketName, id, inputStream, objectMetadata));
+        return (putObjectResult == null ? null : putObjectResult.getETag());
+    }
+
+    /**
+     * Creates a new object or updates an existing object in the S3 bucket
+     * @param id id of the object to create
+     * @param inputStream object to create as an inputstream
+     * @param contentType content-type of the object
+     * @param contentLength content-length of the object
+     * @param md5 MD5 hash of the object
+     * @return the eTag of the object as created by S3 storage
+     */
+    public String putObject(String id, InputStream inputStream, String contentType, int contentLength, String md5) {
+        ObjectMetadata objectMetadata = new ObjectMetadata();
+        objectMetadata.setContentType(contentType);
+        objectMetadata.setContentLength(contentLength);
+        objectMetadata.setContentMD5(md5);
+
+        return putObject(id, inputStream, objectMetadata);
+    }
+
+    /**
+     * Creates a new object (containing text) in the S3 bucket.
+     * @param id id of the object to create
+     * @param textContents the string to store
+     * @return eTag of the save object
+     */
+    public String putObject(String id, String textContents) {
+        byte[] data = textContents.getBytes(StandardCharsets.UTF_8);
+        ObjectMetadata objectMetadata = generateObjectMetadata(data);
+
+        return putObject(id, new ByteArrayInputStream(data), objectMetadata);
+    }
+
+    /**
+     * Retrieve an S3Object from the bucket. Note that this doesn't download the actual object yet, but will provide
+     * the object metadata as well as a stream that you can use to download the object. Make sure you close the object
+     * when you're done!
+     * @param id the id of the object to retrieve
+     * @return S3Object, null if the object was not found
+     * @throws S3ObjectStorageException if there was an error retrieving the object
+     */
+    public S3Object getObject(String id) {
+        try {
+            return s3Client.getObject(bucketName, id);
+        } catch (AmazonS3Exception e) {
+            if (!is404Exception(e)) {
+                throw new S3ObjectStorageException(ERROR_MSG_RETRIEVE + id, e);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Retrieve the S3 object as a stream. Make sure to close the stream when you're done!
+     * @param id the id of the object to retrieve
+     * @return InputStream to the downloaded object, null if the object was not found
+     */
+    public InputStream getObjectStream(String id) {
+        try {
+            S3Object object = s3Client.getObject(bucketName, id);
+            return object.getObjectContent().getDelegateStream();
+        } catch (AmazonS3Exception e) {
+            if (!is404Exception(e)) {
+                throw new S3ObjectStorageException(ERROR_MSG_RETRIEVE + id, e);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Retrieve the actual S3 object as a byte array. Note that this doesn't download any object metadata. Also this
+     * may not be the most efficient way of retrieving the data as it loads the entire object into memory.
+     * @param id the id of the object to retrieve
+     * @return array of bytes containing the downloaded object, empty array if the object was not found
+     * @throws S3ObjectStorageException if there was an error retrieving the object content
+     */
+    public byte[] getObjectContent(String id) {
+        try (S3Object object = s3Client.getObject(bucketName, id)) {
+            return object.getObjectContent().readAllBytes();
+        } catch (AmazonS3Exception | IOException e) {
+            if (!is404Exception(e)) {
+                throw new S3ObjectStorageException(ERROR_MSG_RETRIEVE + id, e);
+            }
+        }
+        return new byte[0];
+    }
+
+    /**
+     * Retrieves only the metadata of an object
+     * @param id the id of the object for which to retrieve the metadata
+     * @return object metadata, null if the object was not found
+     * @throws S3ObjectStorageException if there was an error retrieving the metadata
+     */
+    public ObjectMetadata getObjectMetadata(String id) {
+        try {
+            return s3Client.getObjectMetadata(bucketName, id);
+        } catch (AmazonS3Exception e) {
+            if (!is404Exception(e)) {
+                throw new S3ObjectStorageException(ERROR_MSG_RETRIEVE + id, e);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Deletes an object if it is present in the bucket
+     * @param id the id of the object that should be deleted
+     * @throws S3ObjectStorageException if there was an error deleting the object
+     */
+    public void deleteObject(String id) {
+        try {
+            DeleteObjectRequest deleteObjectRequest = new DeleteObjectRequest(bucketName, id);
+            s3Client.deleteObject(deleteObjectRequest);
+        } catch (AmazonS3Exception e) {
+            throw new S3ObjectStorageException("Error deleting object " + id, e);
+        }
+    }
+
+    /**
+     * Terminate all connections and shut down this client
+     */
+    public void close() {
+        LOG.info("Shutting down connections to {}...", this.getServiceName());
+        ((AmazonS3Client) s3Client).shutdown();
+        // see also https://stackoverflow.com/questions/18069042/spring-mvc-webapp-schedule-java-sdk-http-connection-reaper-failed-to-stop
+        com.amazonaws.http.IdleConnectionReaper.shutdown();
+    }
+
+    private boolean is404Exception(Exception e) {
+        return (e instanceof AmazonServiceException ase) && (ase.getStatusCode() == HttpStatus.SC_NOT_FOUND);
+    }
+
 }

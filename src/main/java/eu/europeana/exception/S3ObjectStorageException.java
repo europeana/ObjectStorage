@@ -12,7 +12,7 @@
  * express or implied. See the License for the specific language governing
  * permissions and limitations under the License.
  */
-package eu.europeana.domain;
+package eu.europeana.exception;
 
 
 /**
@@ -21,7 +21,7 @@ package eu.europeana.domain;
  * This exception is thrown when service could not be contacted for a response,
  * or when client is unable to parse the response from service.
  */
-public class ObjectStorageClientException extends RuntimeException {
+public class S3ObjectStorageException extends RuntimeException {
 
     /**
      * Creates a new ObjectStorageClientException with the specified message, and root
@@ -30,7 +30,7 @@ public class ObjectStorageClientException extends RuntimeException {
      * @param message An error message describing why this exception was thrown.
      * @param t       The underlying cause of this exception.
      */
-    public ObjectStorageClientException(String message, Throwable t) {
+    public S3ObjectStorageException(String message, Throwable t) {
         super(message, t);
     }
 
@@ -39,7 +39,7 @@ public class ObjectStorageClientException extends RuntimeException {
      *
      * @param message An error message describing why this exception was thrown.
      */
-    public ObjectStorageClientException(String message) {
+    public S3ObjectStorageException(String message) {
         super(message);
     }
 
@@ -48,7 +48,7 @@ public class ObjectStorageClientException extends RuntimeException {
      *
      * @param t The underlying cause of this exception.
      */
-    public ObjectStorageClientException(Throwable t) {
+    public S3ObjectStorageException(Throwable t) {
         super(t);
     }
 }
