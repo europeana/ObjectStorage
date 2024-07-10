@@ -86,9 +86,10 @@
             <plugin>
                 <!-- This will be active when running the verify or install goal
                      To skip (e.g. during debugging) use 'mvn clean package')-->
+                <!-- https://mvnrepository.com/artifact/org.owasp/dependency-check-maven -->
                 <groupId>org.owasp</groupId>
                 <artifactId>dependency-check-maven</artifactId>
-                <version>9.2.0</version>
+                <version>10.0.2</version>
                 <configuration>
                     <nvdApiKeyEnvironmentVariable>NVD_APIKEY</nvdApiKeyEnvironmentVariable>
                     <!-- see EA-3505 why we host the known exploited vulnerabilties file ourselves -->
