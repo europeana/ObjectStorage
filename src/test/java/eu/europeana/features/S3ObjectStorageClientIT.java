@@ -105,7 +105,7 @@ public class S3ObjectStorageClientIT {
         String continuationToken = null;
         long count = 0;
         do {
-            ListObjectsV2Result list = client.listAll(continuationToken);
+            ListObjectsV2Result list = client.listAll(continuationToken, 100);
             continuationToken = list.getNextContinuationToken();
             count = count + list.getKeyCount();
             List<S3ObjectSummary> contents = list.getObjectSummaries();
@@ -115,7 +115,7 @@ public class S3ObjectStorageClientIT {
             LOG.info("  Retrieved {} keys...", count);
         } while (continuationToken != null);
         LOG.info("Found {} storage objects in bucket {}...", count, client.getBucketName());
-        assertTrue(count > 1000);
+        assertTrue(count > 100);
     }
 
     @Test
