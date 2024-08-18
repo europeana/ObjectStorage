@@ -34,7 +34,7 @@ public class S3ObjectStorageClientIT {
 
     private static final int NANO_TO_MS = 1000_000;
 
-    private static final boolean runBluemixTest = true;
+    private static final boolean RUN_BLUEMIX_TEST = true;
 
     private static final String TEST_OBJECT_NAME = "test-object";
     private static final String TEST_OBJECT_DATA = "This is just some text to test storing data in S3...";
@@ -55,7 +55,7 @@ public class S3ObjectStorageClientIT {
     @BeforeAll
     public static void initClientAndTestServer() throws IOException {
         Properties prop = loadAndCheckLoginProperties();
-        if (runBluemixTest) {
+        if (RUN_BLUEMIX_TEST) {
             client = new S3ObjectStorageClient(prop.getProperty("s3.key")
                     , prop.getProperty("s3.secret")
                     , prop.getProperty("s3.region")
@@ -65,8 +65,7 @@ public class S3ObjectStorageClientIT {
             client = new S3ObjectStorageClient(prop.getProperty("s3.key")
                     , prop.getProperty("s3.secret")
                     , prop.getProperty("s3.region")
-                    , prop.getProperty("s3.bucket"),
-                    (Integer) null);
+                    , prop.getProperty("s3.bucket"));
         }
     }
 
@@ -128,11 +127,11 @@ public class S3ObjectStorageClientIT {
     @Test
     public void testGenerateMetaData() {
         byte[] data = TEST_OBJECT_DATA.getBytes(StandardCharsets.UTF_8);
-        ObjectMetadata metadata = client.generateObjectMetadata(data);
+        ObjectMetadata metadata = MetadataUtils.generateObjectMetadata(data);
         assertEquals(data.length, metadata.getContentLength());
         assertEquals(TEST_OBJECT_DATA_MD5, metadata.getContentMD5());
 
-        ObjectMetadata metadata2 = client.generateObjectMetadata(TEST_OBJECT_NAME, new ByteArrayInputStream(data));
+        ObjectMetadata metadata2 = MetadataUtils.generateObjectMetadata(TEST_OBJECT_NAME, new ByteArrayInputStream(data));
         assertEquals(metadata.getContentLength(), metadata2.getContentLength());
         assertEquals(metadata.getContentMD5(), metadata2.getContentMD5());
     }
@@ -143,7 +142,7 @@ public class S3ObjectStorageClientIT {
         assertFalse(client.isObjectAvailable(TEST_OBJECT_NAME));
 
         byte[] data = TEST_OBJECT_DATA.getBytes(StandardCharsets.UTF_8);
-        ObjectMetadata metadata = client.generateObjectMetadata(data);
+        ObjectMetadata metadata = MetadataUtils.generateObjectMetadata(data);
         metadata.setContentType("text/plain");
         metadata.setContentEncoding("UTF-8");
         metadata.setLastModified(new Date());
@@ -211,7 +210,7 @@ public class S3ObjectStorageClientIT {
         final int TEST_SIZE = 100;
         LOG.info("Starting performance test with size {}", TEST_SIZE);
 
-        ObjectMetadata metadata = client.generateObjectMetadata(TEST_OBJECT_DATA.getBytes(StandardCharsets.UTF_8));
+        ObjectMetadata metadata = MetadataUtils.generateObjectMetadata(TEST_OBJECT_DATA.getBytes(StandardCharsets.UTF_8));
         metadata.setContentType("text/plain");
         metadata.setContentEncoding("UTF-8");
         metadata.setLastModified(new Date());

@@ -2,7 +2,6 @@ package eu.europeana.features;
 
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.ClientConfiguration;
-import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.client.builder.AwsClientBuilder;
@@ -10,9 +9,7 @@ import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.*;
-import com.amazonaws.util.BinaryUtils;
 import eu.europeana.exception.S3ObjectStorageException;
-import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpStatus;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -21,9 +18,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.security.DigestInputStream;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.List;
 
 /**
@@ -41,35 +35,36 @@ public class S3ObjectStorageClient {
     private final String bucketName;
     private boolean isIbmCloud = false;
 
+
     /**
      * Creates a new S3 client for Amazon S3
      * @param clientKey client key
      * @param secretKey client secret
      * @param region bucket region
      * @param bucketName bucket name
-     * @param validateAfterInactivity optional, to resolve the stale http connection issue ("The target server failed to
-     *                                respond" errors, see EA-1891), you can set an validateAfterInactivity
      */
-    public S3ObjectStorageClient(String clientKey, String secretKey, String region, String bucketName, Integer validateAfterInactivity) {
-        AWSCredentials credentials = new BasicAWSCredentials(clientKey, secretKey);
-        // setting client configuration
-        if (validateAfterInactivity != null) {
-            ClientConfiguration clientConfiguration = new ClientConfiguration()
-                    .withValidateAfterInactivityMillis(validateAfterInactivity);
-            s3Client = AmazonS3ClientBuilder.standard()
-                    .withCredentials(new AWSStaticCredentialsProvider(credentials))
-                    .withRegion(region)
-                    .withClientConfiguration(clientConfiguration)
-                    .build();
-        } else {
-            s3Client = AmazonS3ClientBuilder.standard()
-                    .withCredentials(new AWSStaticCredentialsProvider(credentials))
-                    .withRegion(region)
-                    .build();
+    public S3ObjectStorageClient(String clientKey, String secretKey, String region, String bucketName) {
+       this(clientKey, secretKey, region, bucketName, (ClientConfiguration) null);
+    }
+
+    /**
+     * Creates a new S3 client for Amazon S3
+     * @param clientKey client key
+     * @param secretKey client secret
+     * @param region bucket region
+     * @param bucketName bucket name
+     * @param clientConfiguration optional, can be used to set a validateAfterInactivity parameter for example (see also EA-1891)
+     */
+    public S3ObjectStorageClient(String clientKey, String secretKey, String region, String bucketName, ClientConfiguration clientConfiguration) {
+        AmazonS3ClientBuilder builder = AmazonS3ClientBuilder.standard()
+                .withCredentials(new AWSStaticCredentialsProvider(new BasicAWSCredentials(clientKey, secretKey)))
+                .withRegion(region);
+        if (clientConfiguration != null) {
+            builder.withClientConfiguration(clientConfiguration);
         }
+        s3Client = builder.build();
         this.bucketName = bucketName;
-        LOG.info("Connected to Amazon S3 bucket {}, region {}, validateAfterInactivity {} ms ", bucketName, region,
-                validateAfterInactivity);
+        LOG.info("Connected to Amazon S3 bucket {}, region {} ", bucketName, region);
     }
 
     /**
@@ -95,27 +90,7 @@ public class S3ObjectStorageClient {
                 .build();
         this.bucketName = bucketName;
         isIbmCloud = true;
-        LOG.info("Connected to IBM Cloud S3 bucket {}, region {}", bucketName, region);
-    }
-
-    /**
-     * Create a new S3 client and specify an endpoint and client options
-     * @param clientKey client key
-     * @param secretKey client secret
-     * @param bucketName bucket name
-     * @param endpoint endpoint to use
-     * @param s3ClientOptions client options to use
-     */
-    public S3ObjectStorageClient(String clientKey, String secretKey, String bucketName, String endpoint, ClientConfiguration s3ClientOptions) {
-        BasicAWSCredentials creds = new BasicAWSCredentials(clientKey, secretKey);
-        s3Client = AmazonS3ClientBuilder.standard()
-                .withCredentials(new AWSStaticCredentialsProvider(creds))
-                .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(endpoint, null))
-                .withClientConfiguration(s3ClientOptions)
-                .build();
-        this.bucketName = bucketName;
-        isIbmCloud = false;
-        LOG.info("Connected to S3 bucket {}", bucketName);
+        LOG.info("Connected to IBM Cloud S3 bucket {}, region {} ", bucketName, region);
     }
 
     /**
@@ -178,49 +153,6 @@ public class S3ObjectStorageClient {
     }
 
     /**
-     * Read the provided inputstream and generate object metadata containing the contentLength and MD5 hash.
-     * Note that generating the metadata is a relatively expensive operation.
-     * @param id optional, name of the object. Only displayed in case of errors
-     * @param inputStream inputstream for which to generate ObjectMetaData
-     * @return new object metadata
-     */
-    public ObjectMetadata generateObjectMetadata(String id, InputStream inputStream) {
-        ObjectMetadata metadata = new ObjectMetadata();
-        byte[] content = new byte[0];
-        try {
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            try (DigestInputStream dis = new DigestInputStream(inputStream, md)) {
-                content = IOUtils.toByteArray(dis);
-                metadata.setContentMD5(BinaryUtils.toBase64(md.digest()));
-            }
-        } catch (NoSuchAlgorithmException e) {
-            LOG.error("Cannot calculate MD5 hash of because no MD5 algorithm was found",e );
-        } catch (IOException e) {
-            LOG.error("Error reading inputStream for object {}", id, e);
-        }
-        Integer intLength = Integer.valueOf(content.length);
-        metadata.setContentLength(intLength.longValue());
-        return metadata;
-    }
-
-    /**
-     * Generate object metadata containing the contentLength and MD5 hash of the provided byte array
-     * @param byteArray the byte array to read
-     * @return new object metadata
-     */
-    public ObjectMetadata generateObjectMetadata(byte[] byteArray) {
-        ObjectMetadata metadata = new ObjectMetadata();
-        try {
-            byte[] md5binary = MessageDigest.getInstance("MD5").digest(byteArray);
-            metadata.setContentMD5(BinaryUtils.toBase64(md5binary));
-        } catch (NoSuchAlgorithmException e) {
-            LOG.error("Cannot calculate MD5 hash of because no MD5 algorithm was found", e);
-        }
-        metadata.setContentLength(byteArray.length);
-        return metadata;
-    }
-
-    /**
      * Creates a new object or updates an existing object in the S3 bucket
      * @param id id of the object to create
      * @param inputStream object to create as an inputstream
@@ -258,7 +190,7 @@ public class S3ObjectStorageClient {
      */
     public String putObject(String id, String textContents) {
         byte[] data = textContents.getBytes(StandardCharsets.UTF_8);
-        ObjectMetadata objectMetadata = generateObjectMetadata(data);
+        ObjectMetadata objectMetadata = MetadataUtils.generateObjectMetadata(data);
 
         return putObject(id, new ByteArrayInputStream(data), objectMetadata);
     }
