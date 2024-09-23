@@ -22,7 +22,7 @@ import java.util.List;
 
 /**
  * Client for accessing objects stored on Amazon or IBM S3 service.
- * Created by jeroen on 14-12-16; adapted to IBM Bluemix S3 by Luthien, Jan 18
+ * Created by jeroen on 14-12-16; adapted to IBM Cloud S3 by Luthien, Jan 18
  * Completely revised June 2024 by Patrick Ehlert
  */
 public class S3ObjectStorageClient {
@@ -68,9 +68,9 @@ public class S3ObjectStorageClient {
     }
 
     /**
-     * Create a new S3 client for IBM Cloud/Bluemix. Calling this constructor sets the boolean isBlueMix
-     * to true; it is used to switch to the correct way of constructing the Object URI when using resource path
-     * addressing (used by Bluemix) instead of virtual host addressing (default usage with Amazon S3).
+     * Create a new S3 client for IBM Cloud. Calling this constructor sets the boolean isIbmCloud to true; it is used to
+     * switch to the correct way of constructing the Object URI when using resource path addressing (used by IBM Cloud)
+     * instead of virtual host addressing (default usage with Amazon S3).
      * Also note that the region parameter is superfluous, but we will maintain it for now in order to be able to
      * overload the constructor (using 5 Strings, hence different from the other two)
      * @param clientKey client key
@@ -80,14 +80,29 @@ public class S3ObjectStorageClient {
      * @param endpoint endpoint to use
      */
     public S3ObjectStorageClient(String clientKey, String secretKey, String region, String bucketName, String endpoint) {
+        this(clientKey, secretKey, region, bucketName, endpoint, null);
+    }
+
+    /**
+     * Creates a new S3 client for Amazon S3
+     * @param clientKey client key
+     * @param secretKey client secret
+     * @param region bucket region
+     * @param bucketName bucket name
+     * @param clientConfiguration optional, can be used to set a validateAfterInactivity parameter for example (see also EA-1891)
+     */
+    public S3ObjectStorageClient(String clientKey, String secretKey, String region, String bucketName, String endpoint, ClientConfiguration clientConfiguration) {
         System.setProperty("com.amazonaws.sdk.disableDNSBuckets", "True");
 
         BasicAWSCredentials creds = new BasicAWSCredentials(clientKey, secretKey);
-        s3Client = AmazonS3ClientBuilder.standard()
+        AmazonS3ClientBuilder builder = AmazonS3ClientBuilder.standard()
                 .withCredentials(new AWSStaticCredentialsProvider(creds))
                 .withPathStyleAccessEnabled(true)
-                .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(endpoint, region))
-                .build();
+                .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(endpoint, region));
+        if (clientConfiguration != null) {
+            builder.withClientConfiguration(clientConfiguration);
+        }
+        s3Client = builder.build();
         this.bucketName = bucketName;
         isIbmCloud = true;
         LOG.info("Connected to IBM Cloud S3 bucket {}, region {} ", bucketName, region);
