@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Created by Jeroen Jeurissen on 18-12-16
  * Updated by Patrick Ehlert on 8 Feb 2017 and revised Jun 2024
  */
+@SuppressWarnings("java:S5786")
 public class S3ObjectStorageClientIT {
 
     private static final Logger LOG = LogManager.getLogger(S3ObjectStorageClientIT.class);

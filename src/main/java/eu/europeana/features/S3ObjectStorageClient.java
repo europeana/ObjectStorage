@@ -89,9 +89,11 @@ public class S3ObjectStorageClient {
      * @param secretKey client secret
      * @param region bucket region
      * @param bucketName bucket name
+     * @param endpoint endpoint to use
      * @param clientConfiguration optional, can be used to set a validateAfterInactivity parameter for example (see also EA-1891)
      */
-    public S3ObjectStorageClient(String clientKey, String secretKey, String region, String bucketName, String endpoint, ClientConfiguration clientConfiguration) {
+    public S3ObjectStorageClient(String clientKey, String secretKey, String region, String bucketName, String endpoint,
+                                 ClientConfiguration clientConfiguration) {
         System.setProperty("com.amazonaws.sdk.disableDNSBuckets", "True");
 
         BasicAWSCredentials creds = new BasicAWSCredentials(clientKey, secretKey);
