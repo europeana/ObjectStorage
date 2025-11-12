@@ -9,12 +9,11 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
@@ -126,15 +125,27 @@ public class S3ObjectStorageClientIT {
     }
 
     @Test
-    public void testGenerateMetaData() {
+    public void testGenerateMetaData() throws IOException {
+        // method1
         byte[] data = TEST_OBJECT_DATA.getBytes(StandardCharsets.UTF_8);
         ObjectMetadata metadata = MetadataUtils.generateObjectMetadata(data);
         assertEquals(data.length, metadata.getContentLength());
         assertEquals(TEST_OBJECT_DATA_MD5, metadata.getContentMD5());
 
-        ObjectMetadata metadata2 = MetadataUtils.generateObjectMetadata(TEST_OBJECT_NAME, new ByteArrayInputStream(data));
-        assertEquals(metadata.getContentLength(), metadata2.getContentLength());
-        assertEquals(metadata.getContentMD5(), metadata2.getContentMD5());
+        // method2
+        ByteArrayInputStream bais2 = new ByteArrayInputStream(data);
+        ObjectMetadata metadata2 = MetadataUtils.generateObjectMetadata(bais2);
+        assertEquals(data.length, metadata2.getContentLength());
+        assertNull(metadata2.getContentMD5());
+        assertEquals(metadata2.getContentLength(), bais2.available()); // stream is not yet consumed
+
+        // method3
+        ByteArrayInputStream bais3 = new ByteArrayInputStream(data);
+        Map.Entry<byte[], ObjectMetadata> metadata3 = MetadataUtils.generateObjectMetadata(TEST_OBJECT_NAME, bais3);
+        assertNotNull(metadata3.getKey());
+        assertEquals(metadata.getContentLength(), metadata3.getValue().getContentLength());
+        assertEquals(metadata.getContentMD5(), metadata3.getValue().getContentMD5());
+        assertEquals(0, bais3.available()); // stream is consumed
     }
 
     @Test

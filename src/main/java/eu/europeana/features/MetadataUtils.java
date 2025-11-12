@@ -11,6 +11,8 @@ import java.io.InputStream;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.AbstractMap;
+import java.util.Map;
 
 /**
  * Utility class for generating ObjectMetadata
@@ -41,13 +43,30 @@ public final class MetadataUtils {
     }
 
     /**
-     * Read the provided inputstream and generate object metadata containing the contentLength and MD5 hash.
-     * Note that generating the metadata is a relatively expensive operation.
-     * @param id optional, name of the object. Only displayed in case of errors
+     * Generate a new object data containing contentLength only. No MD5 is generated.
      * @param inputStream inputstream for which to generate ObjectMetaData
      * @return new object metadata
+     * @throws IOException if the inputstream is not available
      */
-    public static ObjectMetadata generateObjectMetadata(String id, InputStream inputStream) {
+    public static ObjectMetadata generateObjectMetadata(InputStream inputStream) throws IOException {
+        ObjectMetadata metadata = new ObjectMetadata();
+        if (inputStream == null) {
+            metadata.setContentLength(0);
+        } else {
+            metadata.setContentLength(inputStream.available());
+        }
+        return metadata;
+    }
+
+    /**
+     * Read the provided inputstream and generate object metadata containing the contentLength and MD5 hash.
+     * Note that generating this is a relatively expensive operation, plus afterwards the stream is no longer
+     * available! Instead the stream is consumed and the contents are available in the byte[]
+     * @param id optional, name of the object. Only displayed in case of errors
+     * @param inputStream inputstream for which to generate ObjectMetaData
+     * @return Map Entry with the byte[] and generated object metadata
+     */
+    public static Map.Entry<byte[], ObjectMetadata> generateObjectMetadata(String id, InputStream inputStream) {
         ObjectMetadata metadata = new ObjectMetadata();
         byte[] content = new byte[0];
         try {
@@ -63,6 +82,7 @@ public final class MetadataUtils {
         }
         Integer intLength = Integer.valueOf(content.length);
         metadata.setContentLength(intLength.longValue());
-        return metadata;
+        return new AbstractMap.SimpleEntry<>(content, metadata);
     }
+
 }
