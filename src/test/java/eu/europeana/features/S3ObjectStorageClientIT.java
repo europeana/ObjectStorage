@@ -1,6 +1,6 @@
 package eu.europeana.features;
 
-import com.amazonaws.services.s3.model.*;
+import eu.europeana.exception.S3ObjectStorageException;
 import org.apache.commons.io.IOUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -8,11 +8,16 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import software.amazon.awssdk.services.s3.model.Bucket;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
-import java.util.Date;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
@@ -20,12 +25,11 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Integration test for testing (the speed of connections to) Amazon S3 and IBM S3 storage
+ * Integration tests for testing (the speed of connections to) Amazon S3 and IBM S3 storage
  * For this test to work properly you need to place an objectstorage.IT.properties in the src/main/test/resources folder
  * This file needs to contain the following keys that point to an existing bucket at S3 (s3.key, s3.secret, s3.region, s3.bucket).
- *
  * Created by Jeroen Jeurissen on 18-12-16
- * Updated by Patrick Ehlert on 8 Feb 2017 and revised Jun 2024
+ * Major refactoring by Patrick Ehlert on 8 Feb 2017 and revised Jun 2024 and Nov 2025
  */
 @SuppressWarnings("java:S5786")
 public class S3ObjectStorageClientIT {
@@ -34,33 +38,37 @@ public class S3ObjectStorageClientIT {
 
     private static final int NANO_TO_MS = 1000_000;
 
-    private static final boolean RUN_BLUEMIX_TEST = true;
+    // Run tests in IBM S3 (not Amazon S3)
+    private static final boolean IBM_S3_TEST = true;
 
-    private static final String TEST_OBJECT_NAME = "test-object";
-    private static final String TEST_OBJECT_DATA = "This is just some text to test storing data in S3...";
-    private static final String TEST_OBJECT_DATA_MD5 = "Fl6sF5ph/K/FRkP55hJ3Rw==";
+    private static final String TEST_TEXT_OBJECT_ID = "test-object";
+    private static final String TEST_TEXT_OBJECT_DATA = "This is just some text to test storing data in S3...";
 
-    private static final String TEST_OBJECT_NOT_EXISTS = "This is an id to an non-existing s3 object";
+    private static final String TEST_IMAGE_FILENAME = "logo.png";
+
+    private static final String TEST_OBJECT_NOT_EXISTS = "NonExistingObjectId";
 
     private static S3ObjectStorageClient client;
 
     // We time the various retrieval methods to see which is fastest
     // For this we use the properties below
     private static long nrItems = 0;
-    private static long timingS3Object = 0;
     private static long timingMetadata = 0;
-    private static long timingContentStream = 0;
-    private static long timingContentBytes = 0;
+    private static long timingObjectStream = 0;
+    private static long timingObjectStreamRead = 0;
+    private static long timingObjectAndMetadata = 0;
+    private static long timingObjectBytes = 0;
+
 
     @BeforeAll
-    public static void initClientAndTestServer() throws IOException {
+    public static void initClientAndConnectToStorage() throws IOException, URISyntaxException {
         Properties prop = loadAndCheckLoginProperties();
-        if (RUN_BLUEMIX_TEST) {
+        if (IBM_S3_TEST) {
             client = new S3ObjectStorageClient(prop.getProperty("s3.key")
                     , prop.getProperty("s3.secret")
                     , prop.getProperty("s3.region")
                     , prop.getProperty("s3.bucket")
-                    , prop.getProperty("s3.endpoint"));
+                    , new URI(prop.getProperty("s3.endpoint")));
         } else {
             client = new S3ObjectStorageClient(prop.getProperty("s3.key")
                     , prop.getProperty("s3.secret")
@@ -86,13 +94,36 @@ public class S3ObjectStorageClientIT {
     }
 
     @Test
+    public void testGetServiceName() {
+        if (IBM_S3_TEST) {
+            assertTrue(client.getServiceName().contains("IBM"));
+        } else {
+            assertTrue(client.getServiceName().contains("Amazon"));
+        }
+    }
+
+    @Test
     public void testListBuckets() {
         LOG.info("Available buckets are:");
         for (Bucket bucket : client.listBuckets()) {
             assertNotNull(bucket);
-            LOG.info("  {}", bucket.getName());
+            LOG.info("  {}", bucket.name());
         }
 
+    }
+
+    @Test
+    public void testGetBucket() {
+        String bucketName = client.getBucketName();
+        LOG.info("Currently used bucket is {}", bucketName);
+        assertNotNull(bucketName);
+    }
+
+    @Test
+    public void testListFirst50() {
+        int nrResults = 50;
+        ListObjectsV2Response list = client.listAll(null, nrResults);
+        assertEquals(nrResults, list.keyCount());
     }
 
     /**
@@ -104,12 +135,12 @@ public class S3ObjectStorageClientIT {
         String continuationToken = null;
         long count = 0;
         do {
-            ListObjectsV2Result list = client.listAll(continuationToken, 100);
-            continuationToken = list.getNextContinuationToken();
-            count = count + list.getKeyCount();
-            List<S3ObjectSummary> contents = list.getObjectSummaries();
-            for (S3ObjectSummary summary : contents) {
-                assertNotNull(summary.getKey());
+            ListObjectsV2Response list = client.listAll(continuationToken);
+            continuationToken = list.nextContinuationToken();
+            count = count + list.keyCount();
+            for (software.amazon.awssdk.services.s3.model.S3Object obj : list.contents()) {
+                LOG.trace("  {}, {}, {}, {}", obj.key(), obj.eTag(), obj.lastModified(), obj.size());
+                assertNotNull(obj.key());
             }
             LOG.info("  Retrieved {} keys...", count);
         } while (continuationToken != null);
@@ -118,67 +149,164 @@ public class S3ObjectStorageClientIT {
     }
 
     @Test
-    public void testListFirst50() {
-        int nrResults = 50;
-        ListObjectsV2Result list = client.listAll(null, nrResults);
-        assertEquals(nrResults, list.getKeyCount());
-    }
+    public void testIsObjectAvailable() {
+        String objectId = TEST_TEXT_OBJECT_ID;
+        deleteOldTestObject(objectId);
+        assertFalse(client.isObjectAvailable(objectId));
 
-    @Test
-    public void testGenerateMetaData() throws IOException {
-        // method1
-        byte[] data = TEST_OBJECT_DATA.getBytes(StandardCharsets.UTF_8);
-        ObjectMetadata metadata = MetadataUtils.generateObjectMetadata(data);
-        assertEquals(data.length, metadata.getContentLength());
-        assertEquals(TEST_OBJECT_DATA_MD5, metadata.getContentMD5());
-
-        // method2
-        ByteArrayInputStream bais2 = new ByteArrayInputStream(data);
-        ObjectMetadata metadata2 = MetadataUtils.generateObjectMetadata(bais2);
-        assertEquals(data.length, metadata2.getContentLength());
-        assertNull(metadata2.getContentMD5());
-        assertEquals(metadata2.getContentLength(), bais2.available()); // stream is not yet consumed
-
-        // method3
-        ByteArrayInputStream bais3 = new ByteArrayInputStream(data);
-        Map.Entry<byte[], ObjectMetadata> metadata3 = MetadataUtils.generateObjectMetadata(TEST_OBJECT_NAME, bais3);
-        assertNotNull(metadata3.getKey());
-        assertEquals(metadata.getContentLength(), metadata3.getValue().getContentLength());
-        assertEquals(metadata.getContentMD5(), metadata3.getValue().getContentMD5());
-        assertEquals(0, bais3.available()); // stream is consumed
-    }
-
-    @Test
-    public void testPutAndIsAvailable() {
-        deleteOldTestObject(TEST_OBJECT_NAME);
-        assertFalse(client.isObjectAvailable(TEST_OBJECT_NAME));
-
-        byte[] data = TEST_OBJECT_DATA.getBytes(StandardCharsets.UTF_8);
-        ObjectMetadata metadata = MetadataUtils.generateObjectMetadata(data);
-        metadata.setContentType("text/plain");
-        metadata.setContentEncoding("UTF-8");
-        metadata.setLastModified(new Date());
-        String eTag = client.putObject(TEST_OBJECT_NAME, new ByteArrayInputStream(data), metadata);
-
-        assertTrue(client.isObjectAvailable(TEST_OBJECT_NAME));
+        byte[] data = TEST_TEXT_OBJECT_DATA.getBytes(StandardCharsets.UTF_8);
+        String contentType = "text/plain";
+        String eTag = client.putObject(objectId, contentType, data);
+        assertTrue(client.isObjectAvailable(objectId));
         assertNotNull(eTag);
 
-        client.deleteObject(TEST_OBJECT_NAME);
-        assertFalse(client.isObjectAvailable(TEST_OBJECT_NAME));
+        client.deleteObject(objectId);
+        assertFalse(client.isObjectAvailable(objectId));
     }
 
     @Test
-    public void testPutAndRetrieval() {
-        deleteOldTestObject(TEST_OBJECT_NAME);
-
-        String eTag = client.putObject(TEST_OBJECT_NAME, TEST_OBJECT_DATA);
-
+    public void testPutObjectAsBytes() {
+        String objectId = TEST_TEXT_OBJECT_ID;
+        byte[] data = TEST_TEXT_OBJECT_DATA.getBytes(StandardCharsets.UTF_8);
+        String contentType = "text/plain";
+        String eTag = client.putObject(objectId, contentType, data);
         assertNotNull(eTag);
-        byte[] retrieved = client.getObjectContent(TEST_OBJECT_NAME);
-        assertEquals(TEST_OBJECT_DATA, new String(retrieved));
 
-        client.deleteObject(TEST_OBJECT_NAME);
+        // verify it's available and stored with the correct (meta)data
+        Map<String, String> metadata = client.getObjectMetadata(objectId);
+        assertNotNull(metadata);
+        assertEquals(eTag, metadata.get(S3Object.ETAG));
+        assertEquals(contentType, metadata.get(S3Object.CONTENT_TYPE));
+        assertEquals(data.length, Integer.valueOf(metadata.get(S3Object.CONTENT_LENGTH)));
+        assertNotNull(metadata.get(S3Object.LAST_MODIFIED));
+
+        client.deleteObject(objectId);
+        assertFalse(client.isObjectAvailable(objectId));
     }
+
+    @Test
+    public void testPutObjectAsStream()  throws IOException  {
+        String objectId= TEST_IMAGE_FILENAME;
+        try (InputStream in = this.getClass().getClassLoader().getResourceAsStream(objectId)) {
+            assertNotNull(in);
+            String contentType = "image/webp";
+            Integer length = in.available();
+            String eTag = client.putObject(objectId, contentType, in);
+            assertNotNull(eTag);
+
+            // verify it's available and stored with the correct (meta)data
+            Map<String, String> metadata = client.getObjectMetadata(objectId);
+            assertNotNull(metadata);
+            assertEquals(eTag, metadata.get(S3Object.ETAG));
+            assertEquals(contentType, metadata.get(S3Object.CONTENT_TYPE));
+            assertEquals(length, Integer.valueOf(metadata.get(S3Object.CONTENT_LENGTH)));
+            assertNotNull(metadata.get(S3Object.LAST_MODIFIED));
+
+            client.deleteObject(objectId);
+            assertFalse(client.isObjectAvailable(objectId));
+        }
+    }
+
+    @Test
+    public void testPutObjectAndGetObjectMetadata() {
+        String objectId = TEST_TEXT_OBJECT_ID;
+        String key1 = "key1";
+        String value1 = "value1";
+        String key2 = "key2";
+        String value2 = null;
+
+        byte[] data = TEST_TEXT_OBJECT_DATA.getBytes(StandardCharsets.UTF_8);
+        String contentType = "text/csv";
+        Map<String, String> metadataIn = new HashMap<>();
+        metadataIn.put(key1, value1);
+        metadataIn.put(key2, value2);
+        String eTag = client.putObject(objectId, contentType, new ByteArrayInputStream(data), metadataIn);
+        assertNotNull(eTag);
+
+        // verify object is available and stored with the expected metadata
+        Map<String, String> metadataOut = client.getObjectMetadata(objectId);
+        assertNotNull(metadataOut);
+        assertEquals(eTag, metadataOut.get(S3Object.ETAG));
+        assertEquals(contentType, metadataOut.get(S3Object.CONTENT_TYPE));
+        assertTrue(metadataOut.containsKey(key1));
+        assertEquals(value1, metadataOut.get(key1));
+        // apparently S3 only stores keys if there is a value!
+        assertFalse(metadataOut.containsKey(key2));
+
+        client.deleteObject(objectId);
+        assertFalse(client.isObjectAvailable(objectId));
+    }
+
+    @Test
+    public void testPutBytesNoContentType() {
+        byte[] data = TEST_TEXT_OBJECT_DATA.getBytes(StandardCharsets.UTF_8);
+        assertThrows(S3ObjectStorageException.class, () -> {
+            client.putObject(TEST_TEXT_OBJECT_ID, null, data);
+        });
+    }
+
+    @Test
+    public void testPutStreamNoContentType() {
+        ByteArrayInputStream stream = new ByteArrayInputStream(TEST_TEXT_OBJECT_DATA.getBytes(StandardCharsets.UTF_8));
+        assertThrows(S3ObjectStorageException.class, () -> {
+            client.putObject(TEST_TEXT_OBJECT_ID, null, stream);
+        });
+    }
+
+    @Test
+    public void testGetObjectBytes() {
+        String objectId = TEST_TEXT_OBJECT_ID;
+        byte[] data = TEST_TEXT_OBJECT_DATA.getBytes(StandardCharsets.UTF_8);
+        String contentType = "text/plain";
+        String eTag = client.putObject(objectId, contentType, new ByteArrayInputStream(data));
+        assertNotNull(eTag);
+
+        byte[] retrieved = client.getObjectAsBytes(objectId);
+        assertEquals(TEST_TEXT_OBJECT_DATA, new String(retrieved));
+
+        client.deleteObject(objectId);
+    }
+
+    @Test
+    public void testGetObjectStream() throws IOException {
+        String objectId= TEST_IMAGE_FILENAME;
+        Integer length;
+        try (InputStream in = this.getClass().getClassLoader().getResourceAsStream(objectId)) {
+            assertNotNull(in);
+            length = in.available();
+            String contentType = "image/webp";
+            String eTag = client.putObject(objectId, contentType, in);
+            assertNotNull(eTag);
+        }
+
+        InputStream stream = client.getObjectAsStream(objectId);
+        assertNotNull(stream);
+        byte[] byteArray = IOUtils.toByteArray(stream);
+        assertEquals(length, byteArray.length);
+    }
+
+    @Test
+    public void testGetObjectAndMetadata()  {
+        String objectId = TEST_TEXT_OBJECT_ID;
+        byte[] data = TEST_TEXT_OBJECT_DATA.getBytes(StandardCharsets.UTF_8);
+        String contentType = "text/plain";
+        Map<String, String> metadataIn = new HashMap<>();
+        String key1 = "key1";
+        String value1 = "value1";
+        metadataIn.put(key1, value1);
+        String eTag = client.putObject(objectId, contentType, new ByteArrayInputStream(data), metadataIn);
+        assertNotNull(eTag);
+
+        eu.europeana.features.S3Object result = client.getObject(objectId);
+        assertNotNull(result);
+        assertNotNull(result.inputStream());
+        assertNotNull(result.metadata());
+        assertEquals(eTag, result.metadata().get(S3Object.ETAG));
+        assertEquals(contentType, result.metadata().get(S3Object.CONTENT_TYPE));
+        assertTrue(result.metadata().containsKey(key1));
+        assertEquals(value1, result.metadata().get(key1));
+    }
+
 
     /**
      * Test what happens if the metadata of an object does not exist
@@ -192,23 +320,22 @@ public class S3ObjectStorageClientIT {
      * Test what happens if an object does not exist
      */
     @Test
-    public void testGetS3ObjectNotExist() throws IOException {
-        try (S3Object s3Object = client.getObject(TEST_OBJECT_NOT_EXISTS)) {
-            assertNull(s3Object);
+    public void testGetObjectNotExist() throws IOException {
+        String objectId = TEST_OBJECT_NOT_EXISTS;
+        // retrieve as bytes
+        byte[] result = client.getObjectAsBytes(objectId);
+        assertEquals(0, result.length);
+
+        // retrieve as stream
+        try (InputStream s = client.getObjectAsStream(objectId)) {
+            assertNull(s);
         }
+
+        // retrieve stream and metadata
+        S3Object s3object = client.getObject(objectId);
+        assertNull(s3object);
     }
 
-    @Test
-    public void testGetContentStreamNotExists() throws IOException {
-        try (InputStream is = client.getObjectStream(TEST_OBJECT_NOT_EXISTS)) {
-            assertNull(is);
-        }
-    }
-
-    @Test
-    public void testGetContentBytesNotExists() {
-        assertEquals(0, client.getObjectContent(TEST_OBJECT_NOT_EXISTS).length);
-    }
 
     /**
      * Does a stress test of putting, retrieving in different ways and deleting a small test object.
@@ -217,25 +344,27 @@ public class S3ObjectStorageClientIT {
     @Test
     @Timeout(value = 3, unit = TimeUnit.MINUTES)
     void testPerformance() throws IOException {
-        deleteOldTestObject(TEST_OBJECT_NAME);
+        String objectId =  TEST_IMAGE_FILENAME;
+        deleteOldTestObject(objectId);
 
         final int TEST_SIZE = 100;
-        LOG.info("Starting performance test with size {}", TEST_SIZE);
-
-        ObjectMetadata metadata = MetadataUtils.generateObjectMetadata(TEST_OBJECT_DATA.getBytes(StandardCharsets.UTF_8));
-        metadata.setContentType("text/plain");
-        metadata.setContentEncoding("UTF-8");
-        metadata.setLastModified(new Date());
+        LOG.info("Starting performance test with size {}...", TEST_SIZE);
 
         for (int i = 0; i < TEST_SIZE ; i++) {
-            client.putObject(TEST_OBJECT_NAME, IOUtils.toInputStream(TEST_OBJECT_DATA, StandardCharsets.UTF_8), metadata);
-            testRetrieval(TEST_OBJECT_NAME);
-            client.deleteObject(TEST_OBJECT_NAME);
+            try (InputStream in = this.getClass().getClassLoader().getResourceAsStream(objectId)) {
+                assertNotNull(in);
+                String contentType = "image/webp";
+                String eTag = client.putObject(objectId, contentType, in);
+                assertNotNull(eTag);
+            }
+            testRetrieval(objectId);
+            client.deleteObject(objectId);
             // provide feedback about progress
             if (i % 50 == 0) {
-                LOG.info(String.format("%.1f", i * 100.0 / TEST_SIZE) +"%");
+                LOG.info("{}%", String.format("%.1f", i * 100.0 / TEST_SIZE) );
             }
         }
+
         LOG.info("Performance test done.");
     }
 
@@ -250,44 +379,44 @@ public class S3ObjectStorageClientIT {
     }
 
     /**
-     * We support different methods to retrieve data, in this method we test all.
+     * We support different methods to retrieve data, in this method we test all. The differences in speed are usually
+     * small and depend largely on network latency and S3 service performance. Generally, getObjectMetadata is fastest,
+     * then getObjectStream without reading.
      * @id object to use for retrieval tests
      */
     private void testRetrieval(String id) throws IOException {
         long start;
+        byte[] content;
 
-        // 1. Retrieve as S3Object (so actual content not downloaded)
+        // 1. Retrieve only metadata not object itself, fastest of all 4 methods but doesn't get actual content
         start = System.nanoTime();
-        try (S3Object s3Object = client.getObject(id)) {
-            timingS3Object += (System.nanoTime() - start);
-            // to avoid warnings from S3 we call abort
-            s3Object.getObjectContent().abort();
-            assertNotNull(s3Object);
-            assertEquals(id, s3Object.getKey());
-        }
-
-        // 1b. Retrieve only metadata (so actual content not downloaded)
-        start = System.nanoTime();
-        ObjectMetadata metadata = client.getObjectMetadata(id);
+        Map<String, String> metadata = client.getObjectMetadata(id);
         timingMetadata += (System.nanoTime() - start);
         assertNotNull(metadata);
-        assertNotNull(metadata.getETag());
 
-        // 3. Retrieve content as byte array (similar performance as method 4 using stream)
+        // 2. Retrieve content as stream and read it (similar performance as get object full + read)
         start = System.nanoTime();
-        byte[] content = client.getObjectContent(id);
-        timingContentBytes += (System.nanoTime() - start);
-        assertNotNull(content);
-        assertEquals(TEST_OBJECT_DATA, new String(content));
-
-        // 4. Retrieve content via stream (similar performance as method 3 using byte array)
-        start = System.nanoTime();
-        try (InputStream is = client.getObjectStream(id)) {
-            String data = IOUtils.toString(is, StandardCharsets.UTF_8);
-            timingContentStream += (System.nanoTime() - start);
-            assertNotNull(is);
-            assertEquals(TEST_OBJECT_DATA, data);
+        try (InputStream is = client.getObjectAsStream(id)) {
+            timingObjectStream += (System.nanoTime() - start);
+            content = IOUtils.toByteArray(is);
+            timingObjectStreamRead += (System.nanoTime() - start);
+            assertNotNull(content);
         }
+
+        // 3. Retrieve as full object (so inputstream and metadata map, we read the stream for fair comparison)
+        start = System.nanoTime();
+        S3Object s3Object = client.getObject(id);
+        content = IOUtils.toByteArray(s3Object.inputStream());
+        timingObjectAndMetadata += (System.nanoTime() - start);
+        assertNotNull(content);
+        assertNotNull(s3Object.metadata());
+
+        // 4. Retrieve content as byte array
+        start = System.nanoTime();
+        content = client.getObjectAsBytes(id);
+        timingObjectBytes += (System.nanoTime() - start);
+        assertNotNull(content);
+
         nrItems++;
     }
 
@@ -295,11 +424,12 @@ public class S3ObjectStorageClientIT {
     public static void printTimings() {
         client.close();
 
-        LOG.info("Time spend on retrieval of {} items...", nrItems);
-        LOG.info("  S3Object (no content)  : {} ", timingS3Object / NANO_TO_MS);
-        LOG.info("  Metadata (no content)  : {} ", timingMetadata / NANO_TO_MS);
-        LOG.info("  Content as byte[] : {} ", timingContentBytes / NANO_TO_MS);
-        LOG.info("  Content as stream : {}", timingContentStream / NANO_TO_MS);
+        LOG.info("Time spend on retrieval of {} items (in ms)...", nrItems);
+        LOG.info("  GetObject metadata only  : {} ", timingMetadata / NANO_TO_MS);
+        LOG.info("  GetObject as stream      : {}", timingObjectStream / NANO_TO_MS);
+        LOG.info("  GetObject as stream+read : {}", timingObjectStreamRead / NANO_TO_MS);
+        LOG.info("  GetObject full+read      : {} ", timingObjectAndMetadata / NANO_TO_MS);
+        LOG.info("  GetObject as byte[]      : {} ", timingObjectBytes / NANO_TO_MS);
     }
 
 }

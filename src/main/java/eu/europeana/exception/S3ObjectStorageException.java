@@ -16,7 +16,7 @@ package eu.europeana.exception;
 
 
 /**
- * Base type for all client exceptions thrown by the ObjectStorageClient.
+ * Base type for all client exceptions thrown by the S3ObjectStorageClient.
  * <p>
  * This exception is thrown when service could not be contacted for a response,
  * or when client is unable to parse the response from service.
