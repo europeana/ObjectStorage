@@ -14,6 +14,7 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3ClientBuilder;
 import software.amazon.awssdk.services.s3.model.*;
+import software.amazon.awssdk.utils.StringUtils;
 
 import java.io.InputStream;
 import java.net.URI;
@@ -30,6 +31,7 @@ public class S3ObjectStorageClient {
 
     private static final Logger LOG = LogManager.getLogger(S3ObjectStorageClient.class);
 
+    private static final String ERROR_MSG_MISSING_ENDPOINT_SCHEME = "Endpoint scheme is missing ";
     private static final String ERROR_MSG_RETRIEVE  = "Error retrieving storage object ";
     private static final String ERROR_MSG_CONTENT_TYPE_REQUIRED = "Setting a content-type is required!";
 
@@ -96,6 +98,9 @@ public class S3ObjectStorageClient {
      */
     public S3ObjectStorageClient(String clientKey, String secretKey, String region, String bucketName, URI endpoint,
                                  SdkHttpClient httpClient) {
+        if (endpoint == null || StringUtils.isBlank(endpoint.getScheme())) {
+            throw new S3ObjectStorageException(ERROR_MSG_MISSING_ENDPOINT_SCHEME + endpoint);
+        }
         AwsBasicCredentials creds = AwsBasicCredentials.create(clientKey, secretKey);
         S3ClientBuilder builder = S3Client.builder()
                 .credentialsProvider(StaticCredentialsProvider.create(creds))
