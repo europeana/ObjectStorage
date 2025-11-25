@@ -173,11 +173,11 @@ public class S3ObjectStorageClientIT {
         assertNotNull(eTag);
 
         // verify it's available and stored with the correct (meta)data
-        Map<String, String> metadata = client.getObjectMetadata(objectId);
+        Map<String, Object> metadata = client.getObjectMetadata(objectId);
         assertNotNull(metadata);
         assertEquals(eTag, metadata.get(S3Object.ETAG));
         assertEquals(contentType, metadata.get(S3Object.CONTENT_TYPE));
-        assertEquals(data.length, Integer.valueOf(metadata.get(S3Object.CONTENT_LENGTH)));
+        assertEquals((long) data.length, metadata.get(S3Object.CONTENT_LENGTH));
         assertNotNull(metadata.get(S3Object.LAST_MODIFIED));
 
         client.deleteObject(objectId);
@@ -190,16 +190,17 @@ public class S3ObjectStorageClientIT {
         try (InputStream in = this.getClass().getClassLoader().getResourceAsStream(objectId)) {
             assertNotNull(in);
             String contentType = "image/webp";
-            Integer length = in.available();
+            Long length = (long) in.available();
             String eTag = client.putObject(objectId, contentType, in);
             assertNotNull(eTag);
 
             // verify it's available and stored with the correct (meta)data
-            Map<String, String> metadata = client.getObjectMetadata(objectId);
+            Map<String, Object> metadata = client.getObjectMetadata(objectId);
             assertNotNull(metadata);
             assertEquals(eTag, metadata.get(S3Object.ETAG));
             assertEquals(contentType, metadata.get(S3Object.CONTENT_TYPE));
-            assertEquals(length, Integer.valueOf(metadata.get(S3Object.CONTENT_LENGTH)));
+            assertEquals(length, metadata.get(S3Object.CONTENT_LENGTH));
+            // once stored last modified date will be automatically set by S3
             assertNotNull(metadata.get(S3Object.LAST_MODIFIED));
 
             client.deleteObject(objectId);
@@ -224,7 +225,7 @@ public class S3ObjectStorageClientIT {
         assertNotNull(eTag);
 
         // verify object is available and stored with the expected metadata
-        Map<String, String> metadataOut = client.getObjectMetadata(objectId);
+        Map<String, Object> metadataOut = client.getObjectMetadata(objectId);
         assertNotNull(metadataOut);
         assertEquals(eTag, metadataOut.get(S3Object.ETAG));
         assertEquals(contentType, metadataOut.get(S3Object.CONTENT_TYPE));
@@ -240,17 +241,13 @@ public class S3ObjectStorageClientIT {
     @Test
     public void testPutBytesNoContentType() {
         byte[] data = TEST_TEXT_OBJECT_DATA.getBytes(StandardCharsets.UTF_8);
-        assertThrows(S3ObjectStorageException.class, () -> {
-            client.putObject(TEST_TEXT_OBJECT_ID, null, data);
-        });
+        assertThrows(S3ObjectStorageException.class, () -> client.putObject(TEST_TEXT_OBJECT_ID, null, data));
     }
 
     @Test
     public void testPutStreamNoContentType() {
         ByteArrayInputStream stream = new ByteArrayInputStream(TEST_TEXT_OBJECT_DATA.getBytes(StandardCharsets.UTF_8));
-        assertThrows(S3ObjectStorageException.class, () -> {
-            client.putObject(TEST_TEXT_OBJECT_ID, null, stream);
-        });
+        assertThrows(S3ObjectStorageException.class, () -> client.putObject(TEST_TEXT_OBJECT_ID, null, stream));
     }
 
     @Test
@@ -301,8 +298,8 @@ public class S3ObjectStorageClientIT {
         assertNotNull(result);
         assertNotNull(result.inputStream());
         assertNotNull(result.metadata());
-        assertEquals(eTag, result.metadata().get(S3Object.ETAG));
-        assertEquals(contentType, result.metadata().get(S3Object.CONTENT_TYPE));
+        assertEquals(eTag, result.getETag());
+        assertEquals(contentType, result.getContentType());
         assertTrue(result.metadata().containsKey(key1));
         assertEquals(value1, result.metadata().get(key1));
     }
@@ -382,7 +379,7 @@ public class S3ObjectStorageClientIT {
      * We support different methods to retrieve data, in this method we test all. The differences in speed are usually
      * small and depend largely on network latency and S3 service performance. Generally, getObjectMetadata is fastest,
      * then getObjectStream without reading.
-     * @id object to use for retrieval tests
+     * @param id object to use for retrieval tests
      */
     private void testRetrieval(String id) throws IOException {
         long start;
@@ -390,7 +387,7 @@ public class S3ObjectStorageClientIT {
 
         // 1. Retrieve only metadata not object itself, fastest of all 4 methods but doesn't get actual content
         start = System.nanoTime();
-        Map<String, String> metadata = client.getObjectMetadata(id);
+        Map<String, Object> metadata = client.getObjectMetadata(id);
         timingMetadata += (System.nanoTime() - start);
         assertNotNull(metadata);
 

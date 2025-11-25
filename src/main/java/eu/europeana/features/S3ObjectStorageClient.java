@@ -86,7 +86,7 @@ public class S3ObjectStorageClient {
     }
 
     /**
-     * Creates a new S3 client for Amazon S3
+     * Creates a new S3 client for IBM Cloud
      * @param clientKey client key
      * @param secretKey client secret
      * @param region bucket region
@@ -189,7 +189,7 @@ public class S3ObjectStorageClient {
      */
     @SuppressWarnings({"java:S1166", "java:S1168" }) // no need to log "no such key exception"
     //also we deliberately return null to indicate the object was not found.
-    public Map<String, String> getObjectMetadata(String id) {
+    public Map<String, Object> getObjectMetadata(String id) {
         try {
             HeadObjectResponse response = s3Client.headObject(req -> req
                     .bucket(this.bucketName)
@@ -208,13 +208,13 @@ public class S3ObjectStorageClient {
      * Unfortunately AWS SDK duplicated metadata fields in HeadObjectResponse and GetObjectResponse, so we also had to
      * duplicate the methods to cover those responses
      */
-    private Map<String, String> fillMetadataFromHead(HeadObjectResponse response) {
-        Map<String, String> metadata = new HashMap<>(response.metadata());
+    private Map<String, Object> fillMetadataFromHead(HeadObjectResponse response) {
+        Map<String, Object> metadata = new HashMap<>(response.metadata());
         if (response.lastModified() != null) {
-            metadata.put(S3Object.LAST_MODIFIED, response.lastModified().toString());
+            metadata.put(S3Object.LAST_MODIFIED, response.lastModified());
         }
         if (response.contentLength() != null) {
-            metadata.put(S3Object.CONTENT_LENGTH, response.contentLength().toString());
+            metadata.put(S3Object.CONTENT_LENGTH, response.contentLength());
         }
         if (response.contentType() != null) {
             metadata.put(S3Object.CONTENT_TYPE, response.contentType());
@@ -231,13 +231,13 @@ public class S3ObjectStorageClient {
         return metadata;
     }
 
-    private Map<String, String> fillMetadataFromGet(GetObjectResponse response) {
-        Map<String, String> metadata = new HashMap<>(response.metadata());
+    private Map<String, Object> fillMetadataFromGet(GetObjectResponse response) {
+        Map<String, Object> metadata = new HashMap<>(response.metadata());
         if (response.lastModified() != null) {
-            metadata.put(S3Object.LAST_MODIFIED, response.lastModified().toString());
+            metadata.put(S3Object.LAST_MODIFIED, response.lastModified());
         }
         if (response.contentLength() != null) {
-            metadata.put(S3Object.CONTENT_LENGTH, response.contentLength().toString());
+            metadata.put(S3Object.CONTENT_LENGTH, response.contentLength());
         }
         if (response.contentType() != null) {
             metadata.put(S3Object.CONTENT_TYPE, response.contentType());
