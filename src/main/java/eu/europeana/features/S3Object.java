@@ -25,6 +25,9 @@ public record S3Object(InputStream inputStream, Map<String, Object> metadata) {
         if (metadata.get(CONTENT_LENGTH) instanceof Long contentLength) {
             return contentLength;
         }
+        if (metadata.get(CONTENT_LENGTH) instanceof Integer contentLength) {
+            return (long) contentLength;
+        }
         return Long.valueOf(metadata.get(CONTENT_LENGTH).toString());
     }
 
