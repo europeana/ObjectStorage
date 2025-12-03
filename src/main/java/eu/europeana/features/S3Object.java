@@ -9,7 +9,7 @@ import java.util.Map;
  * Note that there is also a software.amazon.awssdk.services.s3.model.S3Object but that is only used as a summary then
  * listing objects in a bucket.
  */
-public record S3Object(InputStream inputStream, Map<String, Object> metadata) {
+public record S3Object(InputStream inputStream, Map<String, Object> metadata) implements AutoCloseable {
 
     public static final String CONTENT_LENGTH = "Content-Length";
     public static final String CONTENT_TYPE = "Content-Type";
@@ -69,4 +69,10 @@ public record S3Object(InputStream inputStream, Map<String, Object> metadata) {
         return metadata.get(VERSION_ID).toString();
     }
 
+    @Override
+    public void close() throws Exception {
+        if (this.inputStream != null) {
+            this.inputStream.close();
+        }
+    }
 }
