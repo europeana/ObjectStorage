@@ -1,6 +1,6 @@
-package eu.europeana.features;
+package eu.europeana.s3;
 
-import eu.europeana.exception.S3ObjectStorageException;
+import eu.europeana.s3.exception.S3ObjectStorageException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -310,7 +310,7 @@ public class S3ObjectStorageClient {
                     .bucket(this.bucketName)
                     .key(id)
                     .build(), ResponseTransformer.toBytes());
-            return new S3Object(response.asInputStream(),
+            return new S3Object(id, response.asInputStream(),
                     fillMetadataFromGet(response.response()));
         } catch (NoSuchKeyException noSuchKeyException) {
             return null;

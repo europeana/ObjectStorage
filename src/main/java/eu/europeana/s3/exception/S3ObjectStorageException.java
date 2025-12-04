@@ -12,7 +12,7 @@
  * express or implied. See the License for the specific language governing
  * permissions and limitations under the License.
  */
-package eu.europeana.exception;
+package eu.europeana.s3.exception;
 
 
 /**

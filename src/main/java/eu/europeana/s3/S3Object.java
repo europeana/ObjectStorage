@@ -1,5 +1,6 @@
-package eu.europeana.features;
+package eu.europeana.s3;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.time.Instant;
 import java.util.Map;
@@ -9,7 +10,7 @@ import java.util.Map;
  * Note that there is also a software.amazon.awssdk.services.s3.model.S3Object but that is only used as a summary then
  * listing objects in a bucket.
  */
-public record S3Object(InputStream inputStream, Map<String, Object> metadata) implements AutoCloseable {
+public record S3Object(String key, InputStream inputStream, Map<String, Object> metadata) implements AutoCloseable {
 
     public static final String CONTENT_LENGTH = "Content-Length";
     public static final String CONTENT_TYPE = "Content-Type";
@@ -70,7 +71,7 @@ public record S3Object(InputStream inputStream, Map<String, Object> metadata) im
     }
 
     @Override
-    public void close() throws Exception {
+    public void close() throws IOException {
         if (this.inputStream != null) {
             this.inputStream.close();
         }

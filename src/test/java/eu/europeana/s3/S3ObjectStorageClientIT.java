@@ -1,6 +1,6 @@
-package eu.europeana.features;
+package eu.europeana.s3;
 
-import eu.europeana.exception.S3ObjectStorageException;
+import eu.europeana.s3.exception.S3ObjectStorageException;
 import org.apache.commons.io.IOUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -202,10 +202,9 @@ public class S3ObjectStorageClientIT {
             assertEquals(length, metadata.get(S3Object.CONTENT_LENGTH));
             // once stored last modified date will be automatically set by S3
             assertNotNull(metadata.get(S3Object.LAST_MODIFIED));
-
-            client.deleteObject(objectId);
-            assertFalse(client.isObjectAvailable(objectId));
         }
+        client.deleteObject(objectId);
+        assertFalse(client.isObjectAvailable(objectId));
     }
 
     @Test
@@ -268,6 +267,7 @@ public class S3ObjectStorageClientIT {
     public void testGetObjectStream() throws IOException {
         String objectId= TEST_IMAGE_FILENAME;
         Integer length;
+        // first save it
         try (InputStream in = this.getClass().getClassLoader().getResourceAsStream(objectId)) {
             assertNotNull(in);
             length = in.available();
@@ -275,15 +275,19 @@ public class S3ObjectStorageClientIT {
             String eTag = client.putObject(objectId, contentType, in);
             assertNotNull(eTag);
         }
+        // then test retrieval
+        try (InputStream stream = client.getObjectAsStream(objectId)) {
+            assertNotNull(stream);
+            byte[] byteArray = IOUtils.toByteArray(stream);
+            assertEquals(length, byteArray.length);
+        }
 
-        InputStream stream = client.getObjectAsStream(objectId);
-        assertNotNull(stream);
-        byte[] byteArray = IOUtils.toByteArray(stream);
-        assertEquals(length, byteArray.length);
+        client.deleteObject(objectId);
+        assertFalse(client.isObjectAvailable(objectId));
     }
 
     @Test
-    public void testGetObjectAndMetadata()  {
+    public void testGetObjectAndMetadata() throws IOException {
         String objectId = TEST_TEXT_OBJECT_ID;
         byte[] data = TEST_TEXT_OBJECT_DATA.getBytes(StandardCharsets.UTF_8);
         String contentType = "text/plain";
@@ -294,14 +298,15 @@ public class S3ObjectStorageClientIT {
         String eTag = client.putObject(objectId, contentType, new ByteArrayInputStream(data), metadataIn);
         assertNotNull(eTag);
 
-        eu.europeana.features.S3Object result = client.getObject(objectId);
-        assertNotNull(result);
-        assertNotNull(result.inputStream());
-        assertNotNull(result.metadata());
-        assertEquals(eTag, result.getETag());
-        assertEquals(contentType, result.getContentType());
-        assertTrue(result.metadata().containsKey(key1));
-        assertEquals(value1, result.metadata().get(key1));
+        try (S3Object result = client.getObject(objectId)) {
+            assertNotNull(result);
+            assertNotNull(result.inputStream());
+            assertNotNull(result.metadata());
+            assertEquals(eTag, result.getETag());
+            assertEquals(contentType, result.getContentType());
+            assertTrue(result.metadata().containsKey(key1));
+            assertEquals(value1, result.metadata().get(key1));
+        }
     }
 
 
