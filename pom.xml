@@ -9,7 +9,7 @@
 
     <groupId>eu.europeana</groupId>
     <artifactId>object-storage</artifactId>
-    <version>3.0-SNAPSHOT</version>
+    <version>3.0</version>
 
     <name>Object Storage library</name>
     <description>Java Library for storing and retrieving items in S3</description>
