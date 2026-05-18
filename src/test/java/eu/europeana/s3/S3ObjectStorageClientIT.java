@@ -157,8 +157,7 @@ public class S3ObjectStorageClientIT {
         assertFalse(client.isObjectAvailable(objectId));
 
         byte[] data = TEST_TEXT_OBJECT_DATA.getBytes(StandardCharsets.UTF_8);
-        String contentType = CONTENT_TYPE_TEXT
-        String eTag = client.putObject(objectId, contentType, data);
+        String eTag = client.putObject(objectId, CONTENT_TYPE_TEXT, data);
         assertTrue(client.isObjectAvailable(objectId));
         assertNotNull(eTag);
 
@@ -255,8 +254,7 @@ public class S3ObjectStorageClientIT {
     public void testGetObjectBytes() {
         String objectId = TEST_TEXT_OBJECT_ID;
         byte[] data = TEST_TEXT_OBJECT_DATA.getBytes(StandardCharsets.UTF_8);
-        String contentType = CONTENT_TYPE_TEXT
-        String eTag = client.putObject(objectId, contentType, new ByteArrayInputStream(data));
+        String eTag = client.putObject(objectId, CONTENT_TYPE_TEXT, new ByteArrayInputStream(data));
         assertNotNull(eTag);
 
         byte[] retrieved = client.getObjectAsBytes(objectId);
@@ -292,7 +290,7 @@ public class S3ObjectStorageClientIT {
     void testGetObjectAndMetadata() throws IOException {
         String objectId = TEST_TEXT_OBJECT_ID;
         byte[] data = TEST_TEXT_OBJECT_DATA.getBytes(StandardCharsets.UTF_8);
-        String contentType = CONTENT_TYPE_TEXT
+        String contentType = CONTENT_TYPE_TEXT;
         Map<String, String> metadataIn = new HashMap<>();
         String key1 = "key1";
         String value1 = "value1";
