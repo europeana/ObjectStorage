@@ -209,7 +209,7 @@ public class S3ObjectStorageClient {
 
     /**
      * With AWS S3 SDKv2 fields like lastModified, contentLength, contentType etc. are now part of the response, and not
-     * the metadata. So we put them in the metadata ourselves
+     * the metadata. So we put them in the metadata ourselves.
      * Unfortunately AWS SDK duplicated metadata fields in HeadObjectResponse and GetObjectResponse, so we also had to
      * duplicate the methods to cover those responses
      */
@@ -224,7 +224,7 @@ public class S3ObjectStorageClient {
         if (response.contentType() != null) {
             metadata.put(S3Object.CONTENT_TYPE, response.contentType());
         }
-        if (response.contentLength() != null) {
+        if (response.contentEncoding() != null) {
             metadata.put(S3Object.CONTENT_ENCODING, response.contentEncoding());
         }
         if (response.eTag() != null) {
@@ -247,7 +247,7 @@ public class S3ObjectStorageClient {
         if (response.contentType() != null) {
             metadata.put(S3Object.CONTENT_TYPE, response.contentType());
         }
-        if (response.contentLength() != null) {
+        if (response.contentEncoding() != null) {
             metadata.put(S3Object.CONTENT_ENCODING, response.contentEncoding());
         }
         if (response.eTag() != null) {
