@@ -48,6 +48,8 @@ public class S3ObjectStorageClientIT {
 
     private static final String TEST_OBJECT_NOT_EXISTS = "NonExistingObjectId";
 
+    public static final String CONTENT_TYPE_TEXT = "text/plain";
+
     private static S3ObjectStorageClient client;
 
     // We time the various retrieval methods to see which is fastest
@@ -61,7 +63,7 @@ public class S3ObjectStorageClientIT {
 
 
     @BeforeAll
-    public static void initClientAndConnectToStorage() throws IOException, URISyntaxException {
+    static void initClientAndConnectToStorage() throws IOException, URISyntaxException {
         Properties prop = loadAndCheckLoginProperties();
         if (IBM_S3_TEST) {
             client = new S3ObjectStorageClient(prop.getProperty("s3.key")
@@ -155,7 +157,7 @@ public class S3ObjectStorageClientIT {
         assertFalse(client.isObjectAvailable(objectId));
 
         byte[] data = TEST_TEXT_OBJECT_DATA.getBytes(StandardCharsets.UTF_8);
-        String contentType = "text/plain";
+        String contentType = CONTENT_TYPE_TEXT
         String eTag = client.putObject(objectId, contentType, data);
         assertTrue(client.isObjectAvailable(objectId));
         assertNotNull(eTag);
@@ -168,7 +170,7 @@ public class S3ObjectStorageClientIT {
     public void testPutObjectAsBytes() {
         String objectId = TEST_TEXT_OBJECT_ID;
         byte[] data = TEST_TEXT_OBJECT_DATA.getBytes(StandardCharsets.UTF_8);
-        String contentType = "text/plain";
+        String contentType = CONTENT_TYPE_TEXT;
         String eTag = client.putObject(objectId, contentType, data);
         assertNotNull(eTag);
 
@@ -253,7 +255,7 @@ public class S3ObjectStorageClientIT {
     public void testGetObjectBytes() {
         String objectId = TEST_TEXT_OBJECT_ID;
         byte[] data = TEST_TEXT_OBJECT_DATA.getBytes(StandardCharsets.UTF_8);
-        String contentType = "text/plain";
+        String contentType = CONTENT_TYPE_TEXT
         String eTag = client.putObject(objectId, contentType, new ByteArrayInputStream(data));
         assertNotNull(eTag);
 
@@ -287,10 +289,10 @@ public class S3ObjectStorageClientIT {
     }
 
     @Test
-    public void testGetObjectAndMetadata() throws IOException {
+    void testGetObjectAndMetadata() throws IOException {
         String objectId = TEST_TEXT_OBJECT_ID;
         byte[] data = TEST_TEXT_OBJECT_DATA.getBytes(StandardCharsets.UTF_8);
-        String contentType = "text/plain";
+        String contentType = CONTENT_TYPE_TEXT
         Map<String, String> metadataIn = new HashMap<>();
         String key1 = "key1";
         String value1 = "value1";
@@ -314,7 +316,7 @@ public class S3ObjectStorageClientIT {
      * Test what happens if the metadata of an object does not exist
      */
     @Test
-    public void testGetMetaDataNotExist() {
+    void testGetMetaDataNotExist() {
         assertNull(client.getObjectMetadata(TEST_OBJECT_NOT_EXISTS));
     }
 
@@ -322,7 +324,7 @@ public class S3ObjectStorageClientIT {
      * Test what happens if an object does not exist
      */
     @Test
-    public void testGetObjectNotExist() throws IOException {
+    void testGetObjectNotExist() throws IOException {
         String objectId = TEST_OBJECT_NOT_EXISTS;
         // retrieve as bytes
         byte[] result = client.getObjectAsBytes(objectId);

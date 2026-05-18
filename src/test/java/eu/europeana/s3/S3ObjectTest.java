@@ -13,10 +13,13 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
+/**
+ * Test if S3Objects return the expected fields we support
+ */
 public class S3ObjectTest {
 
     @Test
-    public void S3ObjectInputStream() throws IOException {
+    void testS3ObjectInputStream() throws IOException {
         String id = "test1";
         InputStream test = new ByteArrayInputStream("test".getBytes(Charset.defaultCharset()));
 
@@ -27,7 +30,7 @@ public class S3ObjectTest {
     }
 
     @Test
-    public void S3ObjectMetadata() throws IOException {
+    void testS3ObjectMetadata() throws IOException {
         String id = "test2";
         Long contentLength = 100L;
         String contentType = "application/json";
@@ -58,7 +61,7 @@ public class S3ObjectTest {
      * Check if conversion of Long and Instant to string and back works fine
      */
     @Test
-    public void S3ObjectMetadataFromString() throws IOException {
+    void testS3ObjectMetadataFromString() throws IOException {
         String id = "test3";
         Long contentLength = 100L;
         Instant lastModified = Instant.parse("2025-11-25T09:08:00Z");
@@ -73,7 +76,7 @@ public class S3ObjectTest {
     }
 
     @Test
-    public void S3ObjectMetadataNullValues() throws IOException {
+    void testS3ObjectMetadataNullValues() throws IOException {
         String id = "test4";
         try (S3Object s3Object = new S3Object(id, null, null)) {
             assertNull(s3Object.getContentLength());
